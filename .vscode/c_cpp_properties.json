@@ -1,0 +1,21 @@
+{
+  "configurations": [
+    {
+      "name": "linux-gcc-x64",
+      "includePath": [
+        "${workspaceFolder}/**",
+        "/usr/include",
+        "/usr/local/include",
+        "/home/ne1/kernel-build/sched_ext-sched_ext/tools/sched_ext/include"
+      ],
+      "compilerPath": "/usr/bin/gcc",
+      "cStandard": "c11",  // 设置为 C11 标准
+      "cppStandard": "c++17",  // 设置为 C++17 标准
+      "intelliSenseMode": "linux-gcc-x64",
+      "compilerArgs": [
+        ""
+      ]
+    }
+  ],
+  "version": 4
+}
