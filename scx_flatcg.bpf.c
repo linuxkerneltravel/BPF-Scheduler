@@ -53,9 +53,9 @@
 
 char _license[] SEC("license") = "GPL";
 
-const volatile u32 nr_cpus = 32;	/* !0 for veristat, set during init */
-const volatile u64 cgrp_slice_ns = SCX_SLICE_DFL;
-const volatile bool fifo_sched;
+const volatile u32 nr_cpus = 32; //  CPU 的数量，初始值为 32	/* !0 for veristat, set during init */
+const volatile u64 cgrp_slice_ns = SCX_SLICE_DFL;// 时间片长度，以纳秒为单位
+const volatile bool fifo_sched;// 是否使用 FIFO 调度
 
 u64 cvtime_now;
 UEI_DEFINE(uei);
@@ -64,8 +64,8 @@ struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
 	__type(key, u32);
 	__type(value, u64);
-	__uint(max_entries, FCG_NR_STATS);
-} stats SEC(".maps");
+	__uint(max_entries, FCG_NR_STATS);// FCG_NR_STATS 是为了保证 stats map 的容量刚好容纳所有定义的统计项，从而正确管理和监控所有的调度相关统计数据
+} stats SEC(".maps");// 用于在 eBPF 程序中统计和跟踪系统中各种调度事件的发生次数
 
 static void stat_inc(enum fcg_stat_idx idx)
 {
@@ -77,8 +77,8 @@ static void stat_inc(enum fcg_stat_idx idx)
 }
 
 struct fcg_cpu_ctx {
-	u64			cur_cgid;
-	u64			cur_at;
+	u64			cur_cgid;// 正在调度的cgroup的 ID
+	u64			cur_at;// 调度操作的时间戳
 };
 
 struct {
@@ -86,7 +86,7 @@ struct {
 	__type(key, u32);
 	__type(value, struct fcg_cpu_ctx);
 	__uint(max_entries, 1);
-} cpu_ctx SEC(".maps");
+} cpu_ctx SEC(".maps");//  CPU 当前的调度上下文
 
 struct {
 	__uint(type, BPF_MAP_TYPE_CGRP_STORAGE);
@@ -95,17 +95,17 @@ struct {
 	__type(value, struct fcg_cgrp_ctx);
 } cgrp_ctx SEC(".maps");
 
-struct cgv_node {
-	struct bpf_rb_node	rb_node;
-	__u64			cvtime;
-	__u64			cgid;
-	struct bpf_refcount	refcount;
+struct cgv_node { // 红黑树中的节点
+	struct bpf_rb_node	rb_node;// 红黑树节点的基本结构，作为红黑树中的一个元素
+	__u64			cvtime;// 一个时间戳，用于记录与此节点关联的事件或调度发生的时间
+	__u64			cgid;//  cgroup 的 ID
+	struct bpf_refcount	refcount;// 引用计数器
 };
 
-private(CGV_TREE) struct bpf_spin_lock cgv_tree_lock;
-private(CGV_TREE) struct bpf_rb_root cgv_tree __contains(cgv_node, rb_node);
+private(CGV_TREE) struct bpf_spin_lock cgv_tree_lock; // 自旋锁，用于保护红黑树的并发访问
+private(CGV_TREE) struct bpf_rb_root cgv_tree __contains(cgv_node, rb_node);// 红黑树的根节点
 
-struct cgv_node_stash {
+struct cgv_node_stash {// 暂存红黑树节点的指针
 	struct cgv_node __kptr *node;
 };
 
@@ -114,7 +114,7 @@ struct {
 	__uint(max_entries, 16384);
 	__type(key, __u64);
 	__type(value, struct cgv_node_stash);
-} cgv_node_stash SEC(".maps");
+} cgv_node_stash SEC(".maps");// 哈希类型的 eBPF map,快速查找和引用红黑树中的节点
 
 struct fcg_task_ctx {
 	u64		bypassed_at;
@@ -130,17 +130,17 @@ struct {
 /* gets inc'd on weight tree changes to expire the cached hweights */
 u64 hweight_gen = 1;
 
-static u64 div_round_up(u64 dividend, u64 divisor)
+static u64 div_round_up(u64 dividend, u64 divisor)// 进行向上取整的除法运算
 {
 	return (dividend + divisor - 1) / divisor;
 }
 
-static bool vtime_before(u64 a, u64 b)
+static bool vtime_before(u64 a, u64 b)// 两个时间戳 a 和 b，判断 a 是否在 b 之前
 {
 	return (s64)(a - b) < 0;
 }
 
-static bool cgv_node_less(struct bpf_rb_node *a, const struct bpf_rb_node *b)
+static bool cgv_node_less(struct bpf_rb_node *a, const struct bpf_rb_node *b)// 比较两个红黑树节点的 cvtime，用于决定节点在红黑树中的顺序
 {
 	struct cgv_node *cgc_a, *cgc_b;
 
@@ -150,7 +150,7 @@ static bool cgv_node_less(struct bpf_rb_node *a, const struct bpf_rb_node *b)
 	return cgc_a->cvtime < cgc_b->cvtime;
 }
 
-static struct fcg_cpu_ctx *find_cpu_ctx(void)
+static struct fcg_cpu_ctx *find_cpu_ctx(void) // 查找当前 CPU 的调度上下文
 {
 	struct fcg_cpu_ctx *cpuc;
 	u32 idx = 0;
@@ -163,7 +163,7 @@ static struct fcg_cpu_ctx *find_cpu_ctx(void)
 	return cpuc;
 }
 
-static struct fcg_cgrp_ctx *find_cgrp_ctx(struct cgroup *cgrp)
+static struct fcg_cgrp_ctx *find_cgrp_ctx(struct cgroup *cgrp)// 查找给定控制组的上下文信息
 {
 	struct fcg_cgrp_ctx *cgc;
 
@@ -175,7 +175,7 @@ static struct fcg_cgrp_ctx *find_cgrp_ctx(struct cgroup *cgrp)
 	return cgc;
 }
 
-static struct fcg_cgrp_ctx *find_ancestor_cgrp_ctx(struct cgroup *cgrp, int level)
+static struct fcg_cgrp_ctx *find_ancestor_cgrp_ctx(struct cgroup *cgrp, int level)// 查找给定控制组的某一层级的祖先控制组的上下文信息
 {
 	struct fcg_cgrp_ctx *cgc;
 
@@ -192,7 +192,7 @@ static struct fcg_cgrp_ctx *find_ancestor_cgrp_ctx(struct cgroup *cgrp, int leve
 	return cgc;
 }
 
-static void cgrp_refresh_hweight(struct cgroup *cgrp, struct fcg_cgrp_ctx *cgc)
+static void cgrp_refresh_hweight(struct cgroup *cgrp, struct fcg_cgrp_ctx *cgc)// 更新控制组的硬件权重（hweight），以确保调度权重的计算是最新的
 {
 	int level;
 
@@ -250,7 +250,7 @@ static void cgrp_refresh_hweight(struct cgroup *cgrp, struct fcg_cgrp_ctx *cgc)
 	}
 }
 
-static void cgrp_cap_budget(struct cgv_node *cgv_node, struct fcg_cgrp_ctx *cgc)
+static void cgrp_cap_budget(struct cgv_node *cgv_node, struct fcg_cgrp_ctx *cgc)// 调整控制组节点的预算，以控制其调度权重在红黑树中的表现
 {
 	u64 delta, cvtime, max_budget;
 
@@ -276,7 +276,7 @@ static void cgrp_cap_budget(struct cgv_node *cgv_node, struct fcg_cgrp_ctx *cgc)
 	cgv_node->cvtime = cvtime;
 }
 
-static void cgrp_enqueued(struct cgroup *cgrp, struct fcg_cgrp_ctx *cgc)
+static void cgrp_enqueued(struct cgroup *cgrp, struct fcg_cgrp_ctx *cgc)// 将cgroup点加入调度队列（红黑树）
 {
 	struct cgv_node_stash *stash;
 	struct cgv_node *cgv_node;
@@ -310,7 +310,7 @@ static void cgrp_enqueued(struct cgroup *cgrp, struct fcg_cgrp_ctx *cgc)
 	bpf_spin_unlock(&cgv_tree_lock);
 }
 
-static void set_bypassed_at(struct task_struct *p, struct fcg_task_ctx *taskc)
+static void set_bypassed_at(struct task_struct *p, struct fcg_task_ctx *taskc)// 标记任务的绕过时间，用于区分任务是否绕过常规调度路径
 {
 	/*
 	 * Tell fcg_stopping() that this bypassed the regular scheduling path

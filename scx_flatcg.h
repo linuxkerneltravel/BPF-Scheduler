@@ -36,7 +36,7 @@ enum fcg_stat_idx {
 	FCG_NR_STATS,
 };
 
-struct fcg_cgrp_ctx {
+struct fcg_cgrp_ctx { // cgroup上下文信息
 	u32			nr_active;
 	u32			nr_runnable;
 	u32			queued;
