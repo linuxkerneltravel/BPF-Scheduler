@@ -138,11 +138,11 @@ struct {
 
 // 进程的内存信息
 struct task_memory_info {
-//    u64 rss;            // 常驻内存（RSS），单位：页
+    u64 rss;            // 常驻内存（RSS），单位：页
     u64 total_vm;       // 虚拟内存总量，单位：页
-//    u64 anon_rss;       // 匿名内存页，单位：页
-//    u64 file_rss;       // 文件映射内存页，单位：页
-//    u64 swap_usage;     // 交换分区使用量，单位：页
+    u64 anon_rss;       // 匿名内存页，单位：页
+    u64 file_rss;       // 文件映射内存页，单位：页
+    u64 swap_usage;     // 交换分区使用量，单位：页
     u64 pgfault;        // 次要页面故障数
     u64 pgmajfault;     // 主要页面故障数
 };
@@ -220,6 +220,13 @@ static s32 update_task_memory_info(struct task_struct *task)
     if (!pid)
         return -ESRCH; // 未找到进程*/
 
+	// 获取任务的 mm_struct
+    struct mm_struct *mm = BPF_CORE_READ(task, mm);
+    if (!mm) {
+    	bpf_printk("Task %u has no associated mm_struct", task->pid);
+    	return -ESRCH; // 任务没有关联的内存描述符
+	}
+
     // 在 Map 中查找对应的 task_memory_info
     struct task_memory_info *mem_info = bpf_task_storage_get(&task_mem_map, task, 0, 0);
     if (!mem_info){
@@ -228,12 +235,12 @@ static s32 update_task_memory_info(struct task_struct *task)
 	}
         
 
-    // 获取任务的 mm_struct
+    /*// 获取任务的 mm_struct
     struct mm_struct *mm = BPF_CORE_READ(task, mm);
     if (!mm) {
     	bpf_printk("Task %u has no associated mm_struct", task->pid);
     	return -ESRCH; // 任务没有关联的内存描述符
-	}
+	}*/
 
 
     // 从 mm_struct 中读取内存统计信息
@@ -242,7 +249,7 @@ static s32 update_task_memory_info(struct task_struct *task)
     u64 swap_usage = BPF_CORE_READ(mm, rss_stat.count[MM_SWAPENTS]);*/
      // 获取内存页数（通过 rss_stat 访问匿名页、文件页、交换分区）
     u64 total_vm = BPF_CORE_READ(mm, total_vm);
-/*    u64 file_rss = 0, anon_rss = 0, swap_usage = 0;
+    u64 file_rss = 0, anon_rss = 0, swap_usage = 0;
 
     struct percpu_counter *rss_stat = BPF_CORE_READ(mm, rss_stat);
 	if (!rss_stat) {
@@ -254,13 +261,13 @@ static s32 update_task_memory_info(struct task_struct *task)
         bpf_probe_read_kernel(&file_rss, sizeof(u64), &rss_stat[MM_FILEPAGES].count);
         bpf_probe_read_kernel(&anon_rss, sizeof(u64), &rss_stat[MM_ANONPAGES].count);
         bpf_probe_read_kernel(&swap_usage, sizeof(u64), &rss_stat[MM_SWAPENTS].count);
-    }*/
+    }
 
     // 更新 mem_info 结构体
-   // mem_info->file_rss = file_rss;
-   // mem_info->anon_rss = anon_rss;
-   // mem_info->rss = file_rss + anon_rss;
-   // mem_info->swap_usage = swap_usage;
+    mem_info->file_rss = file_rss;
+    mem_info->anon_rss = anon_rss;
+    mem_info->rss = file_rss + anon_rss;
+    mem_info->swap_usage = swap_usage;
     mem_info->total_vm = total_vm;
 
     // 从 task_struct 中读取页面故障计数
@@ -269,11 +276,11 @@ static s32 update_task_memory_info(struct task_struct *task)
 
 	// 输出存储的信息
 	bpf_printk("Updated memory info for pid %u:", task->pid);
-	bpf_printk(" total_vm=%llu", mem_info->total_vm);
-	//bpf_printk(" RSS=%llu total_vm=%llu", mem_info->rss, mem_info->total_vm);
-/*	bpf_printk(" anon_rss=%llu file_rss=%llu", mem_info->anon_rss, mem_info->file_rss);
+	//bpf_printk(" total_vm=%llu", mem_info->total_vm);
+	bpf_printk(" RSS=%llu total_vm=%llu", mem_info->rss, mem_info->total_vm);
+	bpf_printk(" anon_rss=%llu file_rss=%llu", mem_info->anon_rss, mem_info->file_rss);
 	bpf_printk(" swap_usage=%llu pgfault=%llu pgmajfault=%llu",
-			   mem_info->swap_usage, mem_info->pgfault, mem_info->pgmajfault);*/
+			   mem_info->swap_usage, mem_info->pgfault, mem_info->pgmajfault);
 	
     return 0; // 成功
 }
@@ -364,10 +371,11 @@ void BPF_STRUCT_OPS(qmap_enqueue, struct task_struct *p, u64 enq_flags)
 
 	bpf_printk("Enqueueing task %d to queue %d______________\n", pid, idx);
     s32 get_mm = update_task_memory_info(p);
-    if(get_mm != 0){
-        scx_bpf_error("task memory read error");
+    /*if(get_mm != 0){
+    //    scx_bpf_error("task memory read error");
+		bpf_printk("task %d memory read error\n", pid);
     //    return;
-    }
+    }*/
 
 
 	/*
@@ -835,6 +843,10 @@ struct {
 	__type(key, u32);
 	__type(value, struct monitor_timer);
 } monitor_timer SEC(".maps");// 只有一个定时器序列
+
+static void monitor_mm(void){
+	
+}
 
 /*
  * Print out the min, avg and max performance levels of CPUs every second to
