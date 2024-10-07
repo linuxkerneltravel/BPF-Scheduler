@@ -65,7 +65,7 @@ int main(int argc, char **argv)
 
 	skel = SCX_OPS_OPEN(qmap_ops, scx_me);
 
-	while ((opt = getopt(argc, argv, "s:e:t:T:l:b:PE:d:D:Spvh")) != -1) {
+	while ((opt = getopt(argc, argv, "s:e:t:T:l:b:PE:d:D:SpvhC")) != -1) {
 		switch (opt) {
 		case 's':
 			skel->rodata->slice_ns = strtoull(optarg, NULL, 0) * 1000;
@@ -108,6 +108,9 @@ int main(int argc, char **argv)
 			break;
 		case 'v':
 			verbose = true;
+			break;
+		case 'C':
+			skel->rodata->cpu_strat = true;
 			break;
 		default:
 			fprintf(stderr, help_fmt, basename(argv[0]));

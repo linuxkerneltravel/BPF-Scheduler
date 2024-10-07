@@ -42,6 +42,8 @@ const volatile char exp_prefix[17];
 const volatile s32 disallow_tgid;
 const volatile bool suppress_dump;// 控制是否抑制调度器的转储输出（如调度队列状态、错误日志等）
 
+const volatile bool cpu_strat;
+
 u32 test_error_cnt;// 用于测试的错误计数器
 
 UEI_DEFINE(uei);// 这个宏通常用于定义用户事件接口（UEI），用于处理和记录特定的事件或状态
@@ -128,6 +130,15 @@ struct cpu_ctx {
 	u32	cpuperf_target;// 标 CPU 性能，用于调整 CPU 频率或能耗目标，以匹配当前的调度需求
 };
 
+struct task_csw{
+	u32 willing_csw;
+	u32 unwilling_csw;
+	u32 static_weight;
+	u32 weight;
+};
+
+/*记录上一次的自愿和非自愿上下文切换次数，如果上一次是自愿上下文切换，就把它放到较低优先级的队列，反之根据上一次被调度运行的时间，被隔的越久的，优先级越高*/
+
 // CPU 上下文存储
 struct {
 	__uint(type, BPF_MAP_TYPE_PERCPU_ARRAY);
@@ -135,6 +146,13 @@ struct {
 	__type(key, u32);
 	__type(value, struct cpu_ctx);
 } cpu_ctx_stor SEC(".maps");
+
+struct {
+	__uint(type, BPF_MAP_TYPE_TASK_STORAGE);
+    __uint(map_flags, BPF_F_NO_PREALLOC);
+	__type(key, int);
+	__type(value, struct task_csw);
+} task_csw_map SEC(".maps");
 
 // 进程的内存信息
 struct task_memory_info {
@@ -210,6 +228,100 @@ static int weight_to_idx(u32 weight)
 		return 4;
 }
 
+static int weight_to_idx_task(u32 weight){
+		// 不同nice值对应的weight值
+	// 在 CFS 中，默认 nice = 0 的任务对应的权重为 1024,大多数任务的 weight 会集中在 1024（默认值）上下
+	 /* -20      88761,     71755,     56483,     46273,     36291,
+ 	 -15      29154,     23254,     18705,     14949,     11916,
+ /* -10       9548,      7620,      6100,      4904,      3906,
+ /*  -5       3121,      2501,      1991,      1586,      1277,
+ /*   0       1024,       820,       655,       526,       423,
+ /*   5        335,       272,       215,       172,       137,
+ /*  10        110,        87,        70,        56,        45,
+ /*  15         36,        29,        23,        18,        15,*/
+
+	if (weight <= 800)
+		return 0;  // 低优先级后台任务
+	else if (weight <= 2000)
+		return 1;  // 普通优先级任务
+	else if (weight <= 4000) 
+		return 2; 
+	else if (weight <= 8000)
+		return 3; 
+	else
+		return 4; 
+}
+
+static void* update_task_weight(struct task_struct *p, u64 enq_flags){
+	if (!p)
+        return NULL; // 参数无效
+	
+	struct task_csw *t_csw = bpf_task_storage_get(&task_csw_map, p, 0, 0);
+	if (!t_csw){
+		scx_bpf_error("task_csw lookup failed");
+		return NULL;
+	}
+	//u32 weight = p->scx.weight;
+	u32 willing_csw = p->nvcsw;
+	u32 unwilling_csw = p->nivcsw;
+
+	t_csw->willing_csw = willing_csw;
+	if(unwilling_csw == 0)
+	{
+		t_csw->unwilling_csw = unwilling_csw;
+		t_csw->weight = p->scx.weight;
+		t_csw->static_weight = p->scx.weight;
+		return t_csw;
+	}
+	else{
+		if(t_csw->unwilling_csw < unwilling_csw){
+			t_csw->unwilling_csw = unwilling_csw;
+			//t_csw->weight = t_csw->weight * 11/10;
+			if(enq_flags & SCX_ENQ_WAKEUP){
+				if(t_csw->weight * 115 / 100 >= 8000)
+				{
+					t_csw->weight = 7900; // 保证任务不会抢占一些最高优先级的任务
+				}
+				else{
+					t_csw->weight = t_csw->weight * 115 / 100;
+				}
+			}
+			else{
+				if(t_csw->weight * 11 / 10 >= 8000)
+				{
+					t_csw->weight = 7900; // 保证任务不会抢占一些最高优先级的任务
+				}
+				else{
+					t_csw->weight = t_csw->weight * 11 / 10;
+				}
+			}	
+		}
+		else
+		{
+			t_csw->unwilling_csw = unwilling_csw;
+			if(enq_flags & SCX_ENQ_WAKEUP){
+				if(t_csw->weight * 11 / 10 >= 8000)
+				{
+					t_csw->weight = 7900; // 保证任务不会抢占一些最高优先级的任务
+				}
+				else{
+					t_csw->weight = t_csw->weight * 11 / 10;
+				}
+			}
+			else{
+				if(t_csw->weight * 95 / 100 > t_csw->static_weight){
+					t_csw->weight = t_csw->weight * 95 / 100;
+				}else{
+					t_csw->weight = t_csw->static_weight;
+				}
+			}
+		}
+		return t_csw;
+	}
+}
+
+
+
 static s32 update_task_memory_info(struct task_struct *task)
 {
     if (!task)
@@ -233,14 +345,7 @@ static s32 update_task_memory_info(struct task_struct *task)
 		bpf_printk("mem_info is NULL for pid: %u", task->pid);
 		return -ENOENT; // 在 Map 中未找到对应的内存信息
 	}
-        
-
-    /*// 获取任务的 mm_struct
-    struct mm_struct *mm = BPF_CORE_READ(task, mm);
-    if (!mm) {
-    	bpf_printk("Task %u has no associated mm_struct", task->pid);
-    	return -ESRCH; // 任务没有关联的内存描述符
-	}*/
+    
 
 
     // 从 mm_struct 中读取内存统计信息
@@ -347,7 +452,19 @@ void BPF_STRUCT_OPS(qmap_enqueue, struct task_struct *p, u64 enq_flags)
 	static u32 user_cnt, kernel_cnt;
 	struct task_ctx *tctx;
 	u32 pid = p->pid;
-	int idx = weight_to_idx(p->scx.weight);// // 根据任务权重决定队列索引
+	//int idx = weight_to_idx(p->scx.weight);// // 根据任务权重决定队列索引
+	int idx;
+	if(cpu_strat){
+		struct task_csw *t_csw = update_task_weight(p,enq_flags);
+		if(!t_csw){
+			idx = weight_to_idx(p->scx.weight);
+		}
+		else{
+			idx = weight_to_idx_task(t_csw->weight);
+		}
+	}else{
+		idx = weight_to_idx(p->scx.weight);
+	}
 	void *ring;
 
 	// // 如果任务是内核线程，根据stall_kernel_nth的值决定是否阻塞
@@ -370,7 +487,7 @@ void BPF_STRUCT_OPS(qmap_enqueue, struct task_struct *p, u64 enq_flags)
 	}
 
 	bpf_printk("Enqueueing task %d to queue %d______________\n", pid, idx);
-    s32 get_mm = update_task_memory_info(p);
+    //s32 get_mm = update_task_memory_info(p);
     /*if(get_mm != 0){
     //    scx_bpf_error("task memory read error");
 		bpf_printk("task %d memory read error\n", pid);
@@ -405,7 +522,16 @@ void BPF_STRUCT_OPS(qmap_enqueue, struct task_struct *p, u64 enq_flags)
 	 * kick an idle CPU.
 	 */
 	// 如果任务由于被高优先级抢占而重新入队，直接加入全局调度队列
-	if (enq_flags & SCX_ENQ_REENQ) {
+	/*if (enq_flags & SCX_ENQ_REENQ) {
+		s32 cpu;
+
+		scx_bpf_dispatch(p, SHARED_DSQ, 0, enq_flags);// // 将任务加入全局调度队列
+		cpu = scx_bpf_pick_idle_cpu(p->cpus_ptr, 0);// // 选择一个空闲的 CPU
+		if (cpu >= 0)
+			scx_bpf_kick_cpu(cpu, SCX_KICK_IDLE);
+		return;
+	}*/
+	if (enq_flags & SCX_ENQ_PREEMPT) {
 		s32 cpu;
 
 		scx_bpf_dispatch(p, SHARED_DSQ, 0, enq_flags);// // 将任务加入全局调度队列
@@ -449,7 +575,20 @@ static void update_core_sched_head_seq(struct task_struct *p)
 {
 	// 在map里找是否有任务p的上下文存储
 	struct task_ctx *tctx = bpf_task_storage_get(&task_ctx_stor, p, 0, 0);
-	int idx = weight_to_idx(p->scx.weight);// 获得任务所对应的队列索引
+	//int idx = weight_to_idx(p->scx.weight);// 获得任务所对应的队列索引
+	int idx;
+	if(cpu_strat){
+		struct task_csw *t_csw = bpf_task_storage_get(&task_csw_map, p, 0, 0);
+		if(!t_csw){
+			idx = weight_to_idx(p->scx.weight);
+		}
+		else{
+			idx = weight_to_idx_task(t_csw->weight);
+		}
+	}
+	else{
+		idx = weight_to_idx(p->scx.weight);
+	}
 
 	// 如果任务压根不在map中，就不需要进一步更新了
 	if (tctx)
@@ -591,8 +730,24 @@ void BPF_STRUCT_OPS(qmap_tick, struct task_struct *p)
 	 * practical strategy to regulate CPU frequency.
 	 */
 	// // 更新 CPU 的平均权重，采用 3/4 的当前平均值和 1/4 的当前任务权重
-	cpuc->avg_weight = cpuc->avg_weight * 3 / 4 + p->scx.weight / 4;
-	idx = weight_to_idx(cpuc->avg_weight);// 根据计算得到的平均权重选择对应的队列索引
+	//cpuc->avg_weight = cpuc->avg_weight * 3 / 4 + p->scx.weight / 4;
+	if(cpu_strat){
+		struct task_csw *t_csw = bpf_task_storage_get(&task_csw_map, p, 0, 0);
+		if(!t_csw){
+			cpuc->avg_weight = cpuc->avg_weight * 3 / 4 + p->scx.weight / 4;
+			idx = weight_to_idx(cpuc->avg_weight);
+		}
+		else{
+			cpuc->avg_weight = cpuc->avg_weight * 3 / 4 + t_csw->weight / 4;
+			idx = weight_to_idx_task(cpuc->avg_weight);
+		}
+	}
+	else{
+		cpuc->avg_weight = cpuc->avg_weight * 3 / 4 + p->scx.weight / 4;
+		idx = weight_to_idx(cpuc->avg_weight);
+	}
+
+//	idx = weight_to_idx(cpuc->avg_weight);// 根据计算得到的平均权重选择对应的队列索引
 	cpuc->cpuperf_target = qidx_to_cpuperf_target[idx];// 根据队列索引设置目标 CPU 性能级别
 
 	// 设置 CPU 的性能目标
@@ -606,7 +761,20 @@ void BPF_STRUCT_OPS(qmap_tick, struct task_struct *p)
 // 衡量任务在调度中的相对位置,相对体现在同样的实际长度，优先级低的值根据其优先级来翻倍
 static s64 task_qdist(struct task_struct *p)
 {
-	int idx = weight_to_idx(p->scx.weight);
+	//int idx = weight_to_idx(p->scx.weight);
+	int idx;
+	if(cpu_strat){
+		struct task_csw *t_csw = bpf_task_storage_get(&task_csw_map, p, 0, 0);
+		if(!t_csw){
+			idx = weight_to_idx(p->scx.weight);
+		}
+		else{
+			idx = weight_to_idx_task(t_csw->weight);
+		}
+	}
+	else{
+		idx = weight_to_idx(p->scx.weight);
+	}
 	struct task_ctx *tctx;
 	s64 qdist;
 
@@ -674,20 +842,16 @@ s32 BPF_STRUCT_OPS(qmap_init_task, struct task_struct *p,
 
 
 	// 初始化 task_mem_map
-	struct task_memory_info *mem_info = bpf_task_storage_get(&task_mem_map, p, 0,
+	/*struct task_memory_info *mem_info = bpf_task_storage_get(&task_mem_map, p, 0,
 					BPF_LOCAL_STORAGE_GET_F_CREATE);
 	if (!mem_info) {
     	//bpf_printk("Error: Failed to get or create mem_info\n");
     	return -ENOMEM;
 	} else {
     	//bpf_printk("Success: mem_info allocated at %p\n", mem_info);
-	}
-
-	/*s32 get_mm = update_task_memory_info(p);
-    if(!get_mm){
-        scx_bpf_error("task memory read error");
-        return -ENOMEM;
-    }*/
+	}*/
+	if(!bpf_task_storage_get(&task_csw_map,p,0,BPF_LOCAL_STORAGE_GET_F_CREATE))
+		return -ENOMEM;	
 
 
 	/*
