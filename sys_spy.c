@@ -20,6 +20,7 @@
 #include "mm_event.h"
 
 #include "cpu_stats.skel.h"
+#include "mm_stats.skel.h"
 #include "blazesym.h"
 
 #define MEMINFO_PATH "/proc/meminfo"

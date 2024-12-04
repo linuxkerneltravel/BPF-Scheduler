@@ -79,6 +79,24 @@
     "bpf_tracing.h": "c",
     "cpu_stats.skel.h": "c",
     "hash_table.h": "c",
-    "blazesym.h": "c"
+    "blazesym.h": "c",
+    "*.tcc": "c",
+    "concepts": "c",
+    "cstddef": "c",
+    "cstdio": "c",
+    "cwchar": "c",
+    "functional": "c",
+    "memory": "c",
+    "tuple": "c",
+    "random": "c",
+    "new": "c",
+    "stdexcept": "c",
+    "system_error": "c",
+    "typeinfo": "c",
+    "bit": "c",
+    "mm_stats.skel.h": "c",
+    "mm_leak.skel.h": "c",
+    "bpf_core_read.h": "c",
+    "mm_event.h": "c"
   }
 }

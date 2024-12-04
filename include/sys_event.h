@@ -20,6 +20,9 @@ typedef unsigned int u32;
 
 #define MAX_PROCESS_ENTRIES 2048
 
+#define GLOBAL_HASH_SIZE 256
+
+#define GLOBAL_HASH_BUCKET_SIZE 4
 
 
 #define MAX_STACK_DEPTH 20 // 栈回溯最大深度
@@ -32,6 +35,18 @@ typedef __u64 stack_trace_t[MAX_STACK_DEPTH];
 		__uint(value_size, sizeof(value_type)); \
 		__uint(max_entries, MAX_ENTRIES); \
 	} map_name SEC(".maps");
+
+// #define DEFINE_BPF_HASH_MAP(map_name, map_type, MAX_ENTRIES, key_type, value_type ,value_num) \
+// 	struct { \
+// 		__uint(type, map_type); \
+// 		__uint(key_size, sizeof(key_type)); \
+// 		__uint(value_size, sizeof(value_type) * value_num); \
+// 		__uint(max_entries, MAX_ENTRIES); \
+// 	} map_name SEC(".maps");
+
+struct data_store{
+    u32 list[GLOBAL_HASH_BUCKET_SIZE + 1];
+};
 
 enum para_pass_kind{
     CPU_PARA,
@@ -51,6 +66,21 @@ struct task_info_simple{
     u32 cpu_id; 
     char comm[TASK_COMM_LEN];
 };
+
+struct task_public_info {
+    u32 pid;
+    u32 tgid;
+    u64 last_run_time;
+    char comm[TASK_COMM_LEN];
+};
+
+struct process_public_info
+{
+    u32 tgid;
+    u32 kids_length;
+    u64 last_total_clear;
+};
+
 
 enum time_unit{
     MICROSECONDS,  // 微秒

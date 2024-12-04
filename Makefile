@@ -222,8 +222,8 @@ INCLUDES := -I$(OUTPUT) -I../../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I$(L
 CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
-APPS = cpu_stats
-TARGETS = sys_spy
+APPS = cpu_stats mm_stats mm_leak
+TARGETS = mm_spy
 CONTROLLER := cpu_controller
 
 SRC_DIR = ./include
@@ -295,6 +295,15 @@ $(OUTPUT)/%.bpf.o: bpf/%.bpf.c $(LIBBPF_OBJ) $(wildcard %.h) $(VMLINUX) | $(OUTP
 		     $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES)		      \
 		     -c $(filter %.c,$^) -o $(patsubst %.bpf.o,%.tmp.bpf.o,$@)
 	$(Q)$(BPFTOOL) gen object $@ $(patsubst %.bpf.o,%.tmp.bpf.o,$@)
+
+# $(OUTPUT)/%.bpf.o: bpf/%.bpf.c $(LIBBPF_OBJ) $(wildcard %.h) $(VMLINUX) | $(OUTPUT) $(BPFTOOL)
+# 	$(call msg,BPF,$@)
+# 	$(Q)$(CLANG) -g -O1 -target bpf -D__TARGET_ARCH_$(ARCH) \
+# 		         $(INCLUDES) $(CLANG_BPF_SYS_INCLUDES) \
+# 		         -c $(filter %.c,$^) -o $(patsubst %.bpf.o,%.tmp.bpf.o,$@)
+# 	$(Q)$(BPFTOOL) gen object $@ $(patsubst %.bpf.o,%.tmp.bpf.o,$@)
+
+
 
 # Generate BPF skeletons
 .PHONY: $(APPS)
