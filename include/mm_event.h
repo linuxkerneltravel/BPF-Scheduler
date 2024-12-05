@@ -64,6 +64,8 @@ struct task_mm_stats {
     u32 kmem_count;
     u32 vmem_count;
     u32 slab_count;
+
+	u32 already_output;
 };
 
 struct process_mm_stats {
@@ -74,6 +76,8 @@ struct process_mm_stats {
     u32 slab_count;
 
 	u64 last_clear_time;
+
+	u32 already_output;
 };
 
 struct oom_event{

@@ -222,8 +222,8 @@ INCLUDES := -I$(OUTPUT) -I../../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I$(L
 CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
-APPS = cpu_stats mm_stats mm_leak
-TARGETS = mm_spy
+APPS = cpu_stats mm_stats mm_leak io_stats
+TARGETS = io_spy
 CONTROLLER := cpu_controller
 
 SRC_DIR = ./include

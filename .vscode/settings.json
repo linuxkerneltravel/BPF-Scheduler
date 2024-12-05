@@ -97,6 +97,7 @@
     "mm_stats.skel.h": "c",
     "mm_leak.skel.h": "c",
     "bpf_core_read.h": "c",
-    "mm_event.h": "c"
+    "mm_event.h": "c",
+    "proc_data.h": "c"
   }
 }
