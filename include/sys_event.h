@@ -9,6 +9,8 @@
 #define TASK_COMM_LEN 16
 typedef unsigned long long u64;
 typedef unsigned int u32;
+typedef __u16 u16;
+typedef __u8 u8;
 
 #define MSEC 1000000 // 1毫秒
 
@@ -70,7 +72,7 @@ struct task_info_simple{
 struct task_public_info {
     u32 pid;
     u32 tgid;
-    u64 last_run_time;
+    u64 time;
     char comm[TASK_COMM_LEN];
 };
 

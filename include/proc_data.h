@@ -6,6 +6,8 @@
 #include <string.h>
 #include <unistd.h>
 
+
+/*---------------------IO部分----------------------------------*/
 #define MAX_DEVICES 256
 #define DEVICE_NAME_LEN 32
 #define DEFAULT_SECTOR_SIZE 512 // 默认扇区大小，可根据需要调整
@@ -246,6 +248,255 @@ int process_disk_stats(DiskStatsContext* context, DiskStats* current, int* devic
     return 0;
 }
 
+/*-------------------------------网络部分----------------------------------------*/
+// 网络接口统计结构体
+typedef struct {
+    char name[32];
+    unsigned long long bytes_recv;
+    unsigned long long packets_recv;
+    unsigned long long errs_recv;
+    unsigned long long drop_recv;
+    unsigned long long bytes_sent;
+    unsigned long long packets_sent;
+    unsigned long long errs_sent;
+    unsigned long long drop_sent;
+} NetDevStats;
 
+static inline void safe_fclose(FILE *fp) {
+    if (fp) {
+        fclose(fp);
+    }
+}
+
+// 读取 /proc/net/dev 文件，解析网络接口的统计信息
+int read_net_dev(NetDevStats **stats, int *count) {
+    FILE *fp = fopen("/proc/net/dev", "r");
+    if (!fp) {
+        perror("fopen");
+        return -1;
+    }
+
+    char line[512];
+    int line_num = 0;
+    int dev_index = 0;
+    int max_devs = MAX_DEVICES;
+    NetDevStats *dev_stats = malloc(max_devs * sizeof(NetDevStats));
+    if (!dev_stats) {
+        perror("malloc");
+        fclose(fp);
+        return -1;
+    }
+
+    while (fgets(line, sizeof(line), fp)) {
+        line_num++;
+        // 跳过前两行标题
+        if (line_num <= 2)
+            continue;
+
+        // 解析每一行
+        char iface[32];
+        unsigned long long bytes_recv, packets_recv, errs_recv, drop_recv;
+        unsigned long long bytes_sent, packets_sent, errs_sent, drop_sent;
+        // 格式参考 /proc/net/dev
+        // eth0: bytes packets errs drop fifo frame compressed multicast bytes packets errs drop fifo colls carrier compressed
+        int scanned = sscanf(line, " %31[^:]: %llu %llu %llu %llu %*u %*u %*u %*u %llu %llu %llu %llu %*u %*u %*u %*u",
+                             iface, &bytes_recv, &packets_recv, &errs_recv, &drop_recv,
+                             &bytes_sent, &packets_sent, &errs_sent, &drop_sent);
+        if (scanned != 9)
+            continue; // 解析失败，跳过
+
+        // 如果超过当前分配的大小，重新分配
+        if (dev_index >= max_devs) {
+            max_devs *= 2;
+            NetDevStats *temp = realloc(dev_stats, max_devs * sizeof(NetDevStats));
+            if (!temp) {
+                perror("realloc");
+                free(dev_stats);
+                fclose(fp);
+                return -1;
+            }
+            dev_stats = temp;
+        }
+
+        // 填充结构体
+        strncpy(dev_stats[dev_index].name, iface, sizeof(dev_stats[dev_index].name) - 1);
+        dev_stats[dev_index].name[sizeof(dev_stats[dev_index].name) - 1] = '\0'; // 确保字符串终止
+        dev_stats[dev_index].bytes_recv = bytes_recv;
+        dev_stats[dev_index].packets_recv = packets_recv;
+        dev_stats[dev_index].errs_recv = errs_recv;
+        dev_stats[dev_index].drop_recv = drop_recv;
+        dev_stats[dev_index].bytes_sent = bytes_sent;
+        dev_stats[dev_index].packets_sent = packets_sent;
+        dev_stats[dev_index].errs_sent = errs_sent;
+        dev_stats[dev_index].drop_sent = drop_sent;
+
+        // 调试输出
+        // printf("Parsed Interface: %s | Bytes Received: %llu | Packets Received: %llu | Errs Rcv: %llu | Drops Rcv: %llu | Bytes Sent: %llu | Packets Sent: %llu | Errs Sent: %llu | Drops Sent: %llu\n",
+        //        dev_stats[dev_index].name,
+        //        dev_stats[dev_index].bytes_recv,
+        //        dev_stats[dev_index].packets_recv,
+        //        dev_stats[dev_index].errs_recv,
+        //        dev_stats[dev_index].drop_recv,
+        //        dev_stats[dev_index].bytes_sent,
+        //        dev_stats[dev_index].packets_sent,
+        //        dev_stats[dev_index].errs_sent,
+        //        dev_stats[dev_index].drop_sent);
+
+        dev_index++;
+    }
+
+    fclose(fp);
+    *stats = dev_stats;
+    *count = dev_index;
+    return 0;
+}
+
+
+// 读取 /proc/net/tcp 文件，统计当前TCP连接数
+int read_net_tcp(int *tcp_count) {
+    FILE *fp = fopen("/proc/net/tcp", "r");
+    if (!fp) {
+        perror("fopen");
+        return -1;
+    }
+
+    char line[512];
+    int line_num = 0;
+    int count = 0;
+
+    while (fgets(line, sizeof(line), fp)) {
+        line_num++;
+        // 跳过第一行标题
+        if (line_num == 1)
+            continue;
+
+        // 每一行代表一个TCP连接，简单统计行数
+        count++;
+    }
+
+    fclose(fp);
+    *tcp_count = count;
+    return 0;
+}
+
+// 读取 /proc/net/udp 和 /proc/net/udp6 文件，统计当前UDP连接数
+int read_net_udp(int *udp_count) {
+    FILE *fp = fopen("/proc/net/udp", "r");
+    if (!fp) {
+        perror("fopen");
+        return -1;
+    }
+
+    char line[512];
+    int line_num = 0;
+    int count = 0;
+
+    while (fgets(line, sizeof(line), fp)) {
+        line_num++;
+        // 跳过第一行标题
+        if (line_num == 1)
+            continue;
+
+        // 每一行代表一个UDP连接，简单统计行数
+        count++;
+    }
+
+    fclose(fp);
+
+    // 同样读取 /proc/net/udp6
+    fp = fopen("/proc/net/udp6", "r");
+    if (!fp) {
+        perror("fopen");
+        return -1;
+    }
+
+    line_num = 0;
+    while (fgets(line, sizeof(line), fp)) {
+        line_num++;
+        if (line_num == 1)
+            continue;
+        count++;
+    }
+
+    fclose(fp);
+    *udp_count = count;
+    return 0;
+}
+
+// 打印网络接口的统计信息
+void print_net_dev_stats(NetDevStats *stats, int count) {
+    printf("\n=== Network Interface Statistics ===\n");
+    printf("%-10s %-15s %-15s %-10s %-10s %-15s %-15s %-10s %-10s\n", 
+           "Interface", "Bytes Received", "Packets Received", "Errs Rcv", "Drops Rcv", 
+           "Bytes Sent", "Packets Sent", "Errs Sent", "Drops Sent");
+    for (int i = 0; i < count; i++) {
+        printf("%-10s %-15llu %-15llu %-10llu %-10llu %-15llu %-15llu %-10llu %-10llu\n",
+               stats[i].name,
+               stats[i].bytes_recv,
+               stats[i].packets_recv,
+               stats[i].errs_recv,
+               stats[i].drop_recv,
+               stats[i].bytes_sent,
+               stats[i].packets_sent,
+               stats[i].errs_sent,
+               stats[i].drop_sent);
+    }
+}
+
+// 打印当前TCP连接数
+void print_tcp_count(int tcp_count) {
+    printf("\n=== TCP Connections ===\n");
+    printf("Total TCP Connections: %d\n", tcp_count);
+}
+
+// 打印当前UDP连接数
+void print_udp_count(int udp_count) {
+    printf("\n=== UDP Connections ===\n");
+    printf("Total UDP Connections: %d\n", udp_count);
+}
+
+// 释放网络接口统计结构的内存
+void free_net_dev_stats(NetDevStats *stats) {
+    if (stats)
+        free(stats);
+}
+
+// 监控网络
+int monitor_network() {
+    NetDevStats *dev_stats = NULL;
+    int dev_count = 0;
+    int tcp_count = 0;
+    int udp_count = 0;
+
+    // 读取网络接口统计
+    if (read_net_dev(&dev_stats, &dev_count) != 0) {
+        fprintf(stderr, "Failed to read /proc/net/dev.\n");
+        return -1;
+    }
+
+    // 读取TCP连接数
+    if (read_net_tcp(&tcp_count) != 0) {
+        fprintf(stderr, "Failed to read /proc/net/tcp.\n");
+        free_net_dev_stats(dev_stats);
+        return -1;
+    }
+
+    // 读取UDP连接数
+    if (read_net_udp(&udp_count) != 0) {
+        fprintf(stderr, "Failed to read /proc/net/udp.\n");
+        free_net_dev_stats(dev_stats);
+        return -1;
+    }
+
+    // 打印统计信息
+    print_net_dev_stats(dev_stats, dev_count);
+    print_tcp_count(tcp_count);
+    print_udp_count(udp_count);
+
+    // 释放分配的内存
+    free_net_dev_stats(dev_stats);
+
+    return 0;
+}
 
 #endif
