@@ -93,7 +93,7 @@ static int handle_tcp_rcv_state_process(struct sock *sk)
     }
     memset(latency,0,sizeof(struct tcp_net_latency));
     latency->delta = delta;
-    latency->tgid = info->tgid;
+    latency->tgid = info->pid;
     bpf_probe_read_kernel_str(latency->comm,sizeof(info->comm),info->comm);
     latency->ts = now;
     latency->lport = BPF_CORE_READ(sk, __sk_common.skc_num);

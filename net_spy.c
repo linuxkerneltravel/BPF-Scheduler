@@ -22,6 +22,19 @@
 #include "net_event.h"
 #include "net_stats.skel.h"
 
+#define MAX_CSV_FILES 10
+
+static char csv_folder_path[MAX_PATH_LEN];
+
+const char *net_csv_names[] = {
+        "net_latency",
+        "tcprtt",
+        "tcptop",
+        "tcpretrans"
+    };
+
+FILE *net_csv_files[MAX_CSV_FILES];
+
 volatile sig_atomic_t stop = 0;
 
 struct ring_buffer *rb_net_latency = NULL;
@@ -46,7 +59,7 @@ static int net_ring_buffer_poll();
 static int init_time();// 初始化系统当前时间
 
 // 信号处理函数，用于优雅地退出程序
-void handle_sigint(int sig) {
+void net_handle_sigint(int sig) {
     stop = 1;
 }
 
@@ -104,6 +117,28 @@ static struct bpf_link* attach_perf_event_to_program(struct bpf_program *prog, u
     return link;
 }
 
+static int net_create_csv(){
+    int ret;
+    int num_csv_names = sizeof(net_csv_names) / sizeof(net_csv_names[0]);
+    
+    for(int i=0;i<MAX_CSV_FILES;i++)
+        net_csv_files[i] = NULL;
+    
+    // 获取当前工作目录
+    if (getcwd(csv_folder_path, sizeof(csv_folder_path)) == NULL) {
+        perror("getcwd failed");
+        return 1;
+    }
+
+    // 调用 visual_create_run_file 函数
+    if (visual_create_run_file(csv_folder_path, net_csv_names, num_csv_names, net_csv_files) != 0) {
+        fprintf(stderr, "Failed to create run folder and CSV files\n");
+        return 1;
+    }
+    
+    return 0;
+}
+
 int main(int argc, char *argv[]) {
     int ret;
     unsigned int interval = 1; // 默认1秒
@@ -117,6 +152,11 @@ int main(int argc, char *argv[]) {
     ret = init_time();
     if(ret != 0)
         goto cleanup;
+    
+    ret = net_create_csv();
+    if(ret != 0)
+        goto cleanup;
+    
 
     net_skel = net_stats_bpf__open();
     if(!net_skel){
@@ -134,7 +174,7 @@ int main(int argc, char *argv[]) {
     //printf("Starting network monitoring every %u second(s)...\n", interval);
 
     // 注册信号处理器，捕获Ctrl-C (SIGINT)
-    signal(SIGINT, handle_sigint);
+    signal(SIGINT, net_handle_sigint);
 
     while (!stop) {
         // if (monitor_network() != 0) {
@@ -221,21 +261,21 @@ static int attach_net_skel(struct net_stats_bpf *skel){
 
 static int net_ring_buffer_poll(){
     int ret;
-    ret = ring_buffer__poll(rb_net_latency,500);
+    ret = ring_buffer__poll(rb_net_latency,200);
     if(ret < 0)
     {
         fprintf(stderr, "Error polling net latency ring buffer: %d\n", ret);
         return ret;
     }
 
-    ret = ring_buffer__poll(rb_tcprtt,500);
+    ret = ring_buffer__poll(rb_tcprtt,200);
     if(ret < 0)
     {
         fprintf(stderr, "Error polling tcprtt ring buffer: %d\n", ret);
         return ret;
     }
 
-    ret = ring_buffer__poll(rb_tcptop,500);
+    ret = ring_buffer__poll(rb_tcptop,200);
     if(ret < 0)
     {
         fprintf(stderr, "Error polling tcptop ring buffer: %d\n", ret);
@@ -261,6 +301,13 @@ void net_resource_clean(){
         ring_buffer__free(rb_tcptop);
     if(rb_tcpretrans)
         ring_buffer__free(rb_tcpretrans);
+    
+    for(int i=0;i<MAX_CSV_FILES;i++){
+        if(net_csv_files[i] != NULL)
+            fclose(net_csv_files[i]);
+        else   
+            break;
+    }
     net_stats_bpf__destroy(net_skel);
 }
 
@@ -349,6 +396,41 @@ static int handle_net_latency_event(void *ctx, void *data, size_t data_sz){
            ntohs(event->lport),
            daddr_str,
            ntohs(event->dport));
+    
+    // 将事件信息写入 CSV 文件
+    if (!net_csv_files[0]) {
+        fprintf(stderr, "net_csv_files[0] is NULL. Cannot write to CSV\n");
+        return -1;
+    }
+
+    int fd = fileno(net_csv_files[0]);
+    if (fd == -1) {
+        perror("fileno failed");
+        return -1;
+    }
+
+    struct stat st;
+    if (fstat(fd, &st) == -1) {
+        perror("fstat failed");
+        return -1;
+    }
+
+    // 如果文件为空，写入表头
+    if (st.st_size == 0) {
+        fprintf(net_csv_files[0], "Timestamp,Source_IP,Source_Port,Destination_IP,Destination_Port,TGID,Comm,Delay_us\n");
+        fflush(net_csv_files[0]);
+    }
+
+    fprintf(net_csv_files[0], "%s.%09ld,%s,%u,%s,%u,%u,%.16s,%llu\n",
+        time_buf,
+        absolute_nsec,
+        saddr_str,
+        ntohs(event->lport),
+        daddr_str,
+        ntohs(event->dport),
+        event->tgid,
+        event->comm,
+        (unsigned long long)event->delta);
 
     return 0; // 返回 0 表示继续处理其他事件
 }
@@ -387,6 +469,38 @@ static int handle_usr_tcprtt_event(void *ctx, void *data, size_t data_sz){
         }
     }
     printf("\n");
+
+    // 写入到 CSV 文件
+    if (net_csv_files[1]) {
+        // 获取文件描述符以检查文件大小
+        int fd = fileno(net_csv_files[1]);
+        if (fd == -1) {
+            perror("fileno failed for net_csv_files[1]");
+            return -1;
+        }
+
+        struct stat st;
+        if (fstat(fd, &st) == -1) {
+            perror("fstat failed for net_csv_files[1]");
+            return -1;
+        }
+
+        // 如果文件为空，写入表头
+        if (st.st_size == 0) {
+            fprintf(net_csv_files[1],
+                    "1ms,4ms,16ms,32ms,64ms,128ms,256ms,256ms+\n");
+            fflush(net_csv_files[1]);
+        }
+
+        // 写入事件数据
+        fprintf(net_csv_files[1], "%u,%u,%u,%u,%u,%u,%u,%u\n",
+                event->data[0], event->data[1], event->data[2],
+                event->data[3], event->data[4], event->data[5],
+                event->data[6], event->data[7]);
+    } else {
+        fprintf(stderr, "net_csv_files[1] is NULL. Cannot write to CSV\n");
+    }
+
 
     return 0;
 }
@@ -472,6 +586,44 @@ static int handle_usr_tcptop_event(void *ctx, void *data, size_t data_sz)
            lport,
            daddr_str,
            dport);
+    
+    // 写入到 CSV 文件
+    if (net_csv_files[2]) {
+        // 获取文件描述符以检查文件大小
+        int fd = fileno(net_csv_files[2]);
+        if (fd == -1) {
+            perror("fileno failed for net_csv_files[2]");
+            return -1;
+        }
+
+        struct stat st;
+        if (fstat(fd, &st) == -1) {
+            perror("fstat failed for net_csv_files[2]");
+            return -1;
+        }
+
+        // 如果文件为空，写入表头
+        if (st.st_size == 0) {
+            fprintf(net_csv_files[2],
+                    "Timestamp,PID,Comm,Source_IP,Source_Port,Destination_IP,Destination_Port,Sent_Bytes,Received_Bytes\n");
+            fflush(net_csv_files[2]);
+        }
+
+        // 写入事件数据
+        fprintf(net_csv_files[2], "%s,%u,%s,%s,%u,%s,%u,%llu,%llu\n",
+                time_buf,
+                event->pid,
+                event->comm,
+                saddr_str,
+                lport,
+                daddr_str,
+                dport,
+                (unsigned long long)event->send,
+                (unsigned long long)event->recv);
+        
+    } else {
+        fprintf(stderr, "net_csv_files[2] is NULL. Cannot write to CSV\n");
+    }
 
     return 0;
 }
@@ -607,6 +759,44 @@ static int handle_usr_tcpretrans_event(void *ctx, void *data, size_t data_sz) {
            lport,
            daddr_str,
            dport);
+    
+    // 写入到 CSV 文件
+    if (net_csv_files[3]) {  // 对应重传事件的 CSV 文件
+        int fd = fileno(net_csv_files[3]);
+        if (fd == -1) {
+            perror("fileno failed for net_csv_files[3]");
+            return -1;
+        }
+
+        struct stat st;
+        if (fstat(fd, &st) == -1) {
+            perror("fstat failed for net_csv_files[3]");
+            return -1;
+        }
+
+        // 如果文件为空，写入表头
+        if (st.st_size == 0) {
+            fprintf(net_csv_files[3],
+                    "Timestamp,PID,Comm,Seq,State,Event_Type,Source_IP,Source_Port,Destination_IP,Destination_Port\n");
+            fflush(net_csv_files[3]);
+        }
+
+        // 写入事件数据
+        fprintf(net_csv_files[3], "%s.%09ld,%u,%s,%u,%s,%llu,%s,%u,%s,%u\n",
+                time_buf,
+                absolute_nsec,
+                event->pid,
+                event->comm,
+                event->seq,
+                tcp_state_to_string(event->state),
+                event->type,
+                saddr_str,
+                lport,
+                daddr_str,
+                dport);
+    } else {
+        fprintf(stderr, "net_csv_files[3] is NULL. Cannot write to CSV\n");
+    }
 
     return 0;
 }

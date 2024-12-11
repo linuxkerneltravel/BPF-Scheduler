@@ -5,7 +5,111 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <dirent.h>
+#include <sys/stat.h>
 
+
+#define MAX_PATH_LEN 1024
+
+/*----------------------可视化部分--------------------------------*/
+// 创建文件夹，如果文件夹已存在则不做任何操作
+int create_folder(const char *folder_path) {
+    struct stat st = {0};
+
+    if (stat(folder_path, &st) == -1) {
+        if (mkdir(folder_path, 0755) == -1) {
+            perror("Failed to create folder");
+            return -1;
+        } else {
+            printf("Created folder: %s\n", folder_path);
+        }
+    } else {
+        printf("Folder already exists: %s\n", folder_path);
+    }
+
+    return 0;
+}
+
+// 创建 CSV 文件，并返回文件指针
+FILE* create_csv_in_folder(const char *folder_path, const char *csv_name) {
+    char file_path[MAX_PATH_LEN];
+
+    // 构造文件的完整路径
+    if (snprintf(file_path, sizeof(file_path), "%s/%s.csv", folder_path, csv_name) >= sizeof(file_path)) {
+        fprintf(stderr, "File path too long: %s/%s.csv\n", folder_path, csv_name);
+        return NULL;
+    }
+
+    // 创建 CSV 文件
+    FILE *csv_file = fopen(file_path, "w");
+    if (csv_file == NULL) {
+        perror("Failed to create CSV file");
+        return NULL;
+    }
+
+    printf("Created CSV file: %s\n", file_path);
+    return csv_file;
+}
+
+// 创建下一个 run[i] 文件夹，并返回其路径
+int create_run_folder(const char *base_dir, char *run_folder_path, size_t size) {
+    char visualize_path[MAX_PATH_LEN];
+    snprintf(visualize_path, sizeof(visualize_path), "%s/visualize", base_dir);
+
+    // 创建 "visualize" 文件夹
+    if (create_folder(visualize_path) != 0) {
+        return -1;
+    }
+
+    // 查找现有的 run[i] 文件夹，找到最大的 i
+    DIR *dir = opendir(visualize_path);
+    if (dir == NULL) {
+        perror("opendir failed");
+        return -1;
+    }
+
+    struct dirent *entry;
+    int max_run = 0;
+
+    while ((entry = readdir(dir)) != NULL) {
+        if (strncmp(entry->d_name, "run", 3) == 0) {
+            int num = atoi(entry->d_name + 3); // 获取 run 后的数字部分
+            if (num > max_run) {
+                max_run = num;
+            }
+        }
+    }
+
+    closedir(dir);
+
+    // 创建下一个 run[i] 文件夹
+    int next_run = max_run + 1;
+    snprintf(run_folder_path, size, "%s/run%d", visualize_path, next_run);
+
+    if (create_folder(run_folder_path) != 0) {
+        return -1;
+    }
+
+    return 0;
+}
+
+// 创建 CSV 文件并返回其路径
+int visual_create_run_file(char *csv_folder_path, const char *csv_names[], int num_csv_names, FILE *csv_files[]) {
+    // 创建下一个 run[i] 文件夹
+    if (create_run_folder(csv_folder_path, csv_folder_path, MAX_PATH_LEN) != 0) {
+        return -1;
+    }
+
+    // 为每个 CSV 名称创建文件
+    for (int i = 0; i < num_csv_names; i++) {
+        csv_files[i] = create_csv_in_folder(csv_folder_path, csv_names[i]);
+        if (csv_files[i] == NULL) {
+            return -1;
+        }
+    }
+
+    return 0;
+}
 
 /*---------------------IO部分----------------------------------*/
 #define MAX_DEVICES 256
