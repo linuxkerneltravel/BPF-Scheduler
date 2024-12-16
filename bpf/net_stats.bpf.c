@@ -164,7 +164,8 @@ static int tcp_top_ringbuff_send(struct recv_send_bytes *bytes,struct ipv4_key_t
 }
 
 static int tcp_top_sendstat(struct sock *sk, int size) {
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    //u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u32 pid = bpf_get_current_pid_tgid() & 0xFFFFFFFF; 
     u16 family = 0, dport = 0;
     u64 now = bpf_ktime_get_ns();
 
@@ -235,7 +236,8 @@ static int tcp_kprobe_retrans_event(struct sock *sk, struct sk_buff *skb, u32 ty
     if(!sk)
         return 0;
 
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    //u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u32 pid = bpf_get_current_pid_tgid() & 0xFFFFFFFF; 
     if(pid == filiter_id)
         return 0;
 
@@ -327,14 +329,16 @@ int trace_retransmit(struct tcp_retransmit_skb_event *ctx) {
 // 下面俩处理tcptop
 SEC("kprobe/tcp_sendmsg")
 int BPF_KPROBE(top_tcp_send_entry, struct sock *sk){
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    //u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u32 pid = bpf_get_current_pid_tgid() & 0xFFFFFFFF; 
     bpf_map_update_elem(&top_sock_store,&pid,&sk,BPF_ANY);
     return 0;
 }
 
 SEC("kretprobe/tcp_sendmsg")
 int BPF_KRETPROBE(top_tcp_send_ret, int ret){
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    //u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u32 pid = bpf_get_current_pid_tgid() & 0xFFFFFFFF; 
     struct sock **sockpp = bpf_map_lookup_elem(&top_sock_store, &pid);
     if (!sockpp)
         return 0;
@@ -379,7 +383,8 @@ int BPF_KPROBE(top_tcp_recv_entry, struct sock *sk, int copied){
     if (copied <= 0)
         return 0;
     
-    u32 pid = bpf_get_current_pid_tgid() >> 32;
+    //u32 pid = bpf_get_current_pid_tgid() >> 32;
+    u32 pid = bpf_get_current_pid_tgid() & 0xFFFFFFFF; 
     u16 family = 0, dport = 0;
     u64 now = bpf_ktime_get_ns();
 

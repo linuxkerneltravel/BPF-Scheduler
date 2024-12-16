@@ -18,13 +18,11 @@
 
 #include "cpu_event.h"
 #include "mm_event.h"
+#include "proc_data.h"
 
 #include "cpu_stats.skel.h"
 #include "mm_stats.skel.h"
 #include "blazesym.h"
-
-#define MEMINFO_PATH "/proc/meminfo"
-#define MM_INTERVAL 1  // 定时读取的间隔时间（秒）
 
 // 初始化符号解析器
 static struct blaze_symbolizer *symbolizer;
@@ -239,68 +237,6 @@ static int handle_usr_runqlat_event(void *ctx,void *data, size_t data_sz){
     default:
         break;
     }
-}
-
-FILE *open_meminfo() {
-    FILE *file = fopen(MEMINFO_PATH, "r");
-    if (!file) {
-        perror("Failed to open /proc/meminfo");
-        exit(EXIT_FAILURE);
-    }
-    return file;
-}
-
-void read_meminfo(FILE *file) {
-    rewind(file);
-
-    char key[256];
-    unsigned long value;
-    unsigned long mem_total = 0, mem_free = 0, mem_available = 0, buffers = 0, cached = 0;
-    unsigned long swap_total = 0, swap_free = 0, committed_as = 0, commit_limit = 0;
-
-    while (fscanf(file, "%255[^:]: %lu kB\n", key, &value) == 2) {
-        if (strcmp(key, "MemTotal") == 0) {
-            mem_total = value;
-        } else if (strcmp(key, "MemFree") == 0) {
-            mem_free = value;
-        } else if (strcmp(key, "MemAvailable") == 0) {
-            mem_available = value;
-        } else if (strcmp(key, "Buffers") == 0) {
-            buffers = value;
-        } else if (strcmp(key, "Cached") == 0) {
-            cached = value;
-        } else if (strcmp(key, "SwapTotal") == 0) {
-            swap_total = value;
-        } else if (strcmp(key, "SwapFree") == 0) {
-            swap_free = value;
-        } else if (strcmp(key, "Committed_AS") == 0) {
-            committed_as = value;
-        } else if (strcmp(key, "CommitLimit") == 0) {
-            commit_limit = value;
-        }
-    }
-
-    unsigned long used_memory = mem_total - mem_free;
-    unsigned long used_swap = swap_total - swap_free;
-    double used_memory_percent = (mem_total > 0) ? (100.0 * used_memory / mem_total) : 0.0;
-    double available_memory_percent = (mem_total > 0) ? (100.0 * mem_available / mem_total) : 0.0;
-    double used_swap_percent = (swap_total > 0) ? (100.0 * used_swap / swap_total) : 0.0;
-    double commit_percent = (commit_limit > 0) ? (100.0 * committed_as / commit_limit) : 0.0;
-
-    printf("\n--- Memory Usage ---\n");
-    printf("Total Memory: %lu kB\n", mem_total);
-    printf("Used Memory: %lu kB (%.2f%%)\n", used_memory, used_memory_percent);
-    printf("Available Memory: %lu kB (%.2f%%)\n", mem_available, available_memory_percent);
-    printf("Buffers: %lu kB\n", buffers);
-    printf("Cached: %lu kB\n", cached);
-
-    printf("\n--- Swap Memory ---\n");
-    printf("Total Swap: %lu kB\n", swap_total);
-    printf("Used Swap: %lu kB (%.2f%%)\n", used_swap, used_swap_percent);
-
-    printf("\n--- Memory Commitment ---\n");
-    printf("Commit Limit: %lu kB\n", commit_limit);
-    printf("Committed AS: %lu kB (%.2f%%)\n", committed_as, commit_percent);
 }
 
 static int create_perf_event(u32 period_ms) {

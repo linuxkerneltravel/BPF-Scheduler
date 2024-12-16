@@ -164,7 +164,7 @@ static int io_task_compare_and_commit(struct io_task_stats *task) {
         memset(buff,0,sizeof(struct io_task_stats));
         buff->info.pid = task->info.pid;
         buff->info.tgid = task->info.tgid;
-        bpf_probe_read_kernel_str(buff->info.comm,sizeof(task->info.comm),task->info.comm);  
+        bpf_probe_read_str(buff->info.comm,sizeof(task->info.comm),task->info.comm);  
         buff->read_count = task->read_count;
         buff->write_count = task->write_count;
 
@@ -236,12 +236,14 @@ int io_trace_enter_read(struct trace_event_raw_sys_enter *ctx) {
     if(!task){
         struct io_task_stats init_task;
         memset(&init_task,0,sizeof(struct io_task_stats));
-        struct task_info_simple info = {
-            .pid = pid,
-            .tgid = tgid
-        };
-        bpf_get_current_comm(info.comm,sizeof(info.comm));
-        init_task.info = info;
+        // struct task_info_simple info = {
+        //     .pid = pid,
+        //     .tgid = tgid
+        // };
+        bpf_get_current_comm(init_task.info.comm,sizeof(init_task.info.comm));
+        //init_task.info = info;
+        init_task.info.pid = pid;
+        init_task.info.tgid = tgid;
         init_task.last_clear_time = now;
         init_task.read_count = 1;
         init_task.write_count = 0;
@@ -249,6 +251,11 @@ int io_trace_enter_read(struct trace_event_raw_sys_enter *ctx) {
     }
     else{
         task->read_count += 1;
+        if(task->info.pid == 0)
+        {
+            task->info.pid = pid;
+            task->info.tgid = tgid;
+        }
         bpf_map_update_elem(&io_task_stats_map,&pid,task,BPF_ANY);
         io_task_compare_and_commit(task);
     }
@@ -286,12 +293,14 @@ int io_trace_enter_write(struct trace_event_raw_sys_enter *ctx) {
     if(!task){
         struct io_task_stats init_task;
         memset(&init_task,0,sizeof(struct io_task_stats));
-        struct task_info_simple info = {
-            .pid = pid,
-            .tgid = tgid
-        };
-        bpf_get_current_comm(info.comm,sizeof(info.comm));
-        init_task.info = info;
+        // struct task_info_simple info = {
+        //     .pid = pid,
+        //     .tgid = tgid
+        // };
+        bpf_get_current_comm(init_task.info.comm,sizeof(init_task.info.comm));
+        // init_task.info = info;
+        init_task.info.pid = pid;
+        init_task.info.tgid = tgid;
         init_task.last_clear_time = now;
         init_task.write_count = 1;
         init_task.read_count = 0;
@@ -299,6 +308,11 @@ int io_trace_enter_write(struct trace_event_raw_sys_enter *ctx) {
     }
     else{
         task->write_count += 1;
+        if(task->info.pid == 0)
+        {
+            task->info.pid = pid;
+            task->info.tgid = tgid;
+        }
         bpf_map_update_elem(&io_task_stats_map,&pid,task,BPF_ANY);
         io_task_compare_and_commit(task);
     }

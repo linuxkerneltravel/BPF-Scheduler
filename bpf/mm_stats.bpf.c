@@ -75,6 +75,8 @@ static int task_compare_and_commit(struct task_mm_stats *task){
         return 0;
     }
 
+    //bpf_printk("the current pid is %u\n",task->info.pid);
+
     u64 now = bpf_ktime_get_ns();
     if(task->last_clear_time + threhold->time_window < now){
         task->kmem_count = 0;
@@ -97,7 +99,7 @@ static int task_compare_and_commit(struct task_mm_stats *task){
         memset(buff,0,sizeof(struct task_mm_stats));
         buff->info.pid = task->info.pid;
         buff->info.tgid = task->info.tgid;
-        bpf_probe_read_kernel_str(buff->info.comm,sizeof(task->info.comm),task->info.comm);  
+        bpf_probe_read_str(buff->info.comm,sizeof(task->info.comm),task->info.comm);  
         buff->kmem_count = task->kmem_count;
         buff->slab_count = task->slab_count;
         buff->vmem_count = task->vmem_count;
@@ -342,8 +344,11 @@ int trace_kmalloc(struct trace_event_raw_kmem_alloc *ctx){
 
     struct task_mm_stats *task = bpf_map_lookup_elem(&task_mm_stats_map,&pid);
     if(!task){
-        struct task_mm_stats init_task = init_task_mm(pid,tgid);
+        struct task_mm_stats init_task;
         memset(&init_task, 0, sizeof(struct task_mm_stats));
+        init_task.info.pid = pid;
+        init_task.info.tgid = tgid;
+        bpf_get_current_comm(init_task.info.comm,sizeof(init_task.info.comm));
         init_task.kmem_count = 1;
         init_task.last_clear_time = now;
         bpf_map_update_elem(&task_mm_stats_map,&pid,&init_task,BPF_ANY);
@@ -387,8 +392,11 @@ int trace_kfree(struct trace_event_raw_kmem_kfree *ctx){
 
     struct task_mm_stats *task = bpf_map_lookup_elem(&task_mm_stats_map,&pid);
     if(!task){
-        struct task_mm_stats init_task = init_task_mm(pid,tgid);
+        struct task_mm_stats init_task;
         memset(&init_task, 0, sizeof(struct task_mm_stats));
+        init_task.info.pid = pid;
+        init_task.info.tgid = tgid;
+        bpf_get_current_comm(init_task.info.comm,sizeof(init_task.info.comm));
         init_task.kmem_count = 1;
         init_task.last_clear_time = now;
         bpf_map_update_elem(&task_mm_stats_map,&pid,&init_task,BPF_ANY);
@@ -431,8 +439,11 @@ int BPF_PROG(trace_page_alloc){
 
     struct task_mm_stats *task = bpf_map_lookup_elem(&task_mm_stats_map,&pid);
     if(!task){
-        struct task_mm_stats init_task = init_task_mm(pid,tgid);
+        struct task_mm_stats init_task;
         memset(&init_task, 0, sizeof(struct task_mm_stats));
+        init_task.info.pid = pid;
+        init_task.info.tgid = tgid;
+        bpf_get_current_comm(init_task.info.comm,sizeof(init_task.info.comm));
         init_task.vmem_count = 1;
         init_task.last_clear_time = now;
         bpf_map_update_elem(&task_mm_stats_map,&pid,&init_task,BPF_ANY);
@@ -475,8 +486,11 @@ int BPF_PROG(trace_page_free){
 
     struct task_mm_stats *task = bpf_map_lookup_elem(&task_mm_stats_map,&pid);
     if(!task){
-        struct task_mm_stats init_task = init_task_mm(pid,tgid);
+        struct task_mm_stats init_task;
         memset(&init_task, 0, sizeof(struct task_mm_stats));
+        init_task.info.pid = pid;
+        init_task.info.tgid = tgid;
+        bpf_get_current_comm(init_task.info.comm,sizeof(init_task.info.comm));
         init_task.vmem_count = 1;
         init_task.last_clear_time = now;
         bpf_map_update_elem(&task_mm_stats_map,&pid,&init_task,BPF_ANY);
@@ -519,8 +533,11 @@ int BPF_PROG(trace_cache_alloc){
 
     struct task_mm_stats *task = bpf_map_lookup_elem(&task_mm_stats_map,&pid);
     if(!task){
-        struct task_mm_stats init_task = init_task_mm(pid,tgid);
+        struct task_mm_stats init_task;
         memset(&init_task, 0, sizeof(struct task_mm_stats));
+        init_task.info.pid = pid;
+        init_task.info.tgid = tgid;
+        bpf_get_current_comm(init_task.info.comm,sizeof(init_task.info.comm));
         init_task.slab_count = 1;
         init_task.last_clear_time = now;
         bpf_map_update_elem(&task_mm_stats_map,&pid,&init_task,BPF_ANY);
@@ -564,8 +581,11 @@ int BPF_PROG(trace_cache_free){
 
     struct task_mm_stats *task = bpf_map_lookup_elem(&task_mm_stats_map,&pid);
     if(!task){
-        struct task_mm_stats init_task = init_task_mm(pid,tgid);
+        struct task_mm_stats init_task;
         memset(&init_task, 0, sizeof(struct task_mm_stats));
+        init_task.info.pid = pid;
+        init_task.info.tgid = tgid;
+        bpf_get_current_comm(init_task.info.comm,sizeof(init_task.info.comm));
         init_task.slab_count = 1;
         init_task.last_clear_time = now;
         bpf_map_update_elem(&task_mm_stats_map,&pid,&init_task,BPF_ANY);

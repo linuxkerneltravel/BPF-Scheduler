@@ -6,7 +6,7 @@ import string
 
 SEARCH_URL = "https://httpbin.org/post"  # 用于测试的 HTTP 接口
 THREAD_COUNT = 10
-DURATION = 30
+DURATION = 60
 SLEEP_TIME = 0.5
 
 def generate_large_data(size_in_kb):

@@ -416,18 +416,28 @@ static int handle_net_latency_event(void *ctx, void *data, size_t data_sz){
     }
 
     // 如果文件为空，写入表头
+    // if (st.st_size == 0) {
+    //     fprintf(net_csv_files[0], "Timestamp,Source_IP,Source_Port,Destination_IP,Destination_Port,PID,Comm,Delay_us\n");
+    //     fflush(net_csv_files[0]);
+    // }
     if (st.st_size == 0) {
-        fprintf(net_csv_files[0], "Timestamp,Source_IP,Source_Port,Destination_IP,Destination_Port,TGID,Comm,Delay_us\n");
+        fprintf(net_csv_files[0], "Timestamp,PID,Comm,Delay_us\n");
         fflush(net_csv_files[0]);
     }
 
-    fprintf(net_csv_files[0], "%s.%09ld,%s,%u,%s,%u,%u,%.16s,%llu\n",
+    // fprintf(net_csv_files[0], "%s.%09ld,%s,%u,%s,%u,%u,%.16s,%llu\n",
+    //     time_buf,
+    //     absolute_nsec,
+    //     saddr_str,
+    //     ntohs(event->lport),
+    //     daddr_str,
+    //     ntohs(event->dport),
+    //     event->tgid,
+    //     event->comm,
+    //     (unsigned long long)event->delta);
+    fprintf(net_csv_files[0], "%s.%09ld,%u,%.16s,%llu\n",
         time_buf,
         absolute_nsec,
-        saddr_str,
-        ntohs(event->lport),
-        daddr_str,
-        ntohs(event->dport),
         event->tgid,
         event->comm,
         (unsigned long long)event->delta);
@@ -604,20 +614,28 @@ static int handle_usr_tcptop_event(void *ctx, void *data, size_t data_sz)
 
         // 如果文件为空，写入表头
         if (st.st_size == 0) {
+            // fprintf(net_csv_files[2],
+            //         "Timestamp,PID,Comm,Source_IP,Source_Port,Destination_IP,Destination_Port,Sent_Bytes,Received_Bytes\n");
             fprintf(net_csv_files[2],
-                    "Timestamp,PID,Comm,Source_IP,Source_Port,Destination_IP,Destination_Port,Sent_Bytes,Received_Bytes\n");
+                    "Timestamp,PID,Comm,Sent_Bytes,Received_Bytes\n");
             fflush(net_csv_files[2]);
         }
 
         // 写入事件数据
-        fprintf(net_csv_files[2], "%s,%u,%s,%s,%u,%s,%u,%llu,%llu\n",
+        // fprintf(net_csv_files[2], "%s,%u,%s,%s,%u,%s,%u,%llu,%llu\n",
+        //         time_buf,
+        //         event->pid,
+        //         event->comm,
+        //         saddr_str,
+        //         lport,
+        //         daddr_str,
+        //         dport,
+        //         (unsigned long long)event->send,
+        //         (unsigned long long)event->recv);
+        fprintf(net_csv_files[2], "%s,%u,%s,%llu,%llu\n",
                 time_buf,
                 event->pid,
                 event->comm,
-                saddr_str,
-                lport,
-                daddr_str,
-                dport,
                 (unsigned long long)event->send,
                 (unsigned long long)event->recv);
         
@@ -776,18 +794,31 @@ static int handle_usr_tcpretrans_event(void *ctx, void *data, size_t data_sz) {
 
         // 如果文件为空，写入表头
         if (st.st_size == 0) {
+            // fprintf(net_csv_files[3],
+            //         "Timestamp,PID,Comm,Seq,State,Event_Type,Source_IP,Source_Port,Destination_IP,Destination_Port\n");
             fprintf(net_csv_files[3],
-                    "Timestamp,PID,Comm,Seq,State,Event_Type,Source_IP,Source_Port,Destination_IP,Destination_Port\n");
+                    "Timestamp,PID,Comm,State,Event_Type,Source_IP,Source_Port,Destination_IP,Destination_Port\n");
             fflush(net_csv_files[3]);
         }
 
         // 写入事件数据
-        fprintf(net_csv_files[3], "%s.%09ld,%u,%s,%u,%s,%llu,%s,%u,%s,%u\n",
+        // fprintf(net_csv_files[3], "%s.%09ld,%u,%s,%u,%s,%llu,%s,%u,%s,%u\n",
+        //         time_buf,
+        //         absolute_nsec,
+        //         event->pid,
+        //         event->comm,
+        //         event->seq,
+        //         tcp_state_to_string(event->state),
+        //         event->type,
+        //         saddr_str,
+        //         lport,
+        //         daddr_str,
+        //         dport);
+        fprintf(net_csv_files[3], "%s.%09ld,%u,%s,%s,%llu,%s,%u,%s,%u\n",
                 time_buf,
                 absolute_nsec,
                 event->pid,
                 event->comm,
-                event->seq,
                 tcp_state_to_string(event->state),
                 event->type,
                 saddr_str,

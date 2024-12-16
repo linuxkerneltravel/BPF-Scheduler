@@ -76,7 +76,7 @@ DEFINE_BPF_MAP(occupied_list,BPF_MAP_TYPE_ARRAY,2,u32,struct data_list);
 
 // 任务延迟计数统计
 // 对数增长,8个区间
-DEFINE_BPF_MAP(runqlat_map,BPF_MAP_TYPE_ARRAY,MAX_LATENCY_BUCKETS,u32,struct latency_num);
+DEFINE_BPF_MAP(runqlat_map,BPF_MAP_TYPE_ARRAY,MAX_LATENCY_BUCKETS,u32,u32);
 
 // 环形缓冲区传递数据
 struct {
@@ -593,14 +593,11 @@ int record_task_switch(struct trace_event_raw_sched_switch *ctx)
                 bucket = 6;
             else
                 bucket = 7;
-            struct latency_num *latency = bpf_map_lookup_elem(&runqlat_map,&bucket);
+            u32 *latency = bpf_map_lookup_elem(&runqlat_map,&bucket);
             if(!latency){
-                struct latency_num _l;
-                _l.pre_size = 0;
-                _l.size = 1;
-                bpf_map_update_elem(&runqlat_map,&bucket,&_l,BPF_ANY);
+                bpf_map_update_elem(&runqlat_map,&bucket,&one,BPF_ANY);
             }else{
-                latency->size += 1;
+                *latency = *latency + 1;
                 bpf_map_update_elem(&runqlat_map,&bucket,latency,BPF_ANY);
             }
 
@@ -1083,9 +1080,9 @@ static int perf_update_task_concerd(void){
                         memset(buff,0,sizeof(struct task_cpu_usage));
                         bpf_probe_read_kernel_str(buff->task_info.comm,sizeof(task->task_info.comm),task->task_info.comm);                       
                         buff->task_info.pid = task->task_info.pid;
-                        buff->total_percent = task->total_percent;
-                        buff->kernel_percent = task->kernel_percent;
-                        buff->user_percent = task->user_percent;
+                        buff->total_percent = task->total_percent > 100 ? 99:task->total_percent;
+                        buff->kernel_percent = task->kernel_percent > 100 ? 99:task->kernel_percent;
+                        buff->user_percent = task->user_percent > 100 ? 99:task->user_percent;
                         bpf_ringbuf_submit(buff,0);
                     }
                 }else{
@@ -1169,34 +1166,23 @@ static int perf_update_process_concerd(void){
 }
 
 static int perf_runqlat(void){
+    struct runqlat_perf_data *buff = bpf_ringbuf_reserve(&runqlat_buffer,sizeof(struct runqlat_perf_data),0);
+    if(!buff)
+    {
+        bpf_printk("runqlat ringbuff reserve failed\n");
+        return 0;
+    }
+    memset(buff,0,sizeof(struct runqlat_perf_data));
     for(u32 index=0;index<MAX_LATENCY_BUCKETS;index++){
         u32 i = index;
-        struct latency_num *size = bpf_map_lookup_elem(&runqlat_map,&i);
-        if(!size){
-            struct latency_num l;
-            l.pre_size = 0;
-            l.size = 0;
-            bpf_map_update_elem(&runqlat_map,&i,&l,BPF_ANY);
-        }else{
-            struct latency_num *buff = bpf_ringbuf_reserve(&runqlat_buffer,sizeof(struct latency_num),0);
-            if(!buff){
-                bpf_printk("runqlat ringbuff reserve failed\n");
-            }
-            else{                    
-                memset(buff,0,sizeof(struct latency_num));
-                buff->pre_size = i;
-                if(size->pre_size == 0){
-                    buff->size = size->size;
-                }else{
-                    buff->size = size->pre_size * 70/100 + size->size*30/100; 
-                }
-                bpf_ringbuf_submit(buff, 0);
-            }
-            size->pre_size = size->pre_size * 70/100 + size->size*30/100;
-            size->size = 0;
-            bpf_map_update_elem(&runqlat_map,&i,size,BPF_ANY);
-        }
+        u32 *size = bpf_map_lookup_elem(&runqlat_map,&i);
+        if(!size)
+            buff->data[index] = 0;
+        else
+            buff->data[index] = *size;
     }
+    bpf_ringbuf_submit(buff,0);
+
     return 0;
 }
 

@@ -113,6 +113,10 @@ struct latency_num {
     u32 size;
 };
 
+struct runqlat_perf_data{
+    u32 data[8];
+};
+
 // 任务的cpu使用率
 // 把cpu使用率高的任务，排除掉idle之后，关注起来做栈回溯
 struct task_cpu_usage {

@@ -223,7 +223,7 @@ CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 APPS = cpu_stats mm_stats mm_leak io_stats net_stats
-TARGETS = net_spy
+TARGETS = os_spy
 CONTROLLER := cpu_controller
 
 SRC_DIR = ./include

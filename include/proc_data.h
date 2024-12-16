@@ -7,109 +7,197 @@
 #include <unistd.h>
 #include <dirent.h>
 #include <sys/stat.h>
+#include <stdbool.h> 
 
 
 #define MAX_PATH_LEN 1024
 
 /*----------------------可视化部分--------------------------------*/
-// 创建文件夹，如果文件夹已存在则不做任何操作
-int create_folder(const char *folder_path) {
-    struct stat st = {0};
+int lookup_txt_file(char *txt_file_path, const char *name, FILE **txt_file) {
+    // 检查输入参数
+    if (txt_file_path == NULL || name == NULL || txt_file == NULL) {
+        fprintf(stderr, "Invalid input arguments\n");
+        return -1;
+    }
 
-    if (stat(folder_path, &st) == -1) {
-        if (mkdir(folder_path, 0755) == -1) {
-            perror("Failed to create folder");
+    // 构造完整文件路径
+    char full_file_path[MAX_PATH_LEN];
+    snprintf(full_file_path, sizeof(full_file_path), "%s/%s.txt", txt_file_path, name);
+
+    // 检查文件是否存在
+    struct stat st;
+    if (stat(full_file_path, &st) == 0) {
+        // 文件存在，尝试打开
+        *txt_file = fopen(full_file_path, "r+"); // 以读写模式打开
+        if (*txt_file == NULL) {
+            perror("Error opening existing file");
             return -1;
-        } else {
-            printf("Created folder: %s\n", folder_path);
         }
     } else {
-        printf("Folder already exists: %s\n", folder_path);
-    }
-
-    return 0;
-}
-
-// 创建 CSV 文件，并返回文件指针
-FILE* create_csv_in_folder(const char *folder_path, const char *csv_name) {
-    char file_path[MAX_PATH_LEN];
-
-    // 构造文件的完整路径
-    if (snprintf(file_path, sizeof(file_path), "%s/%s.csv", folder_path, csv_name) >= sizeof(file_path)) {
-        fprintf(stderr, "File path too long: %s/%s.csv\n", folder_path, csv_name);
-        return NULL;
-    }
-
-    // 创建 CSV 文件
-    FILE *csv_file = fopen(file_path, "w");
-    if (csv_file == NULL) {
-        perror("Failed to create CSV file");
-        return NULL;
-    }
-
-    printf("Created CSV file: %s\n", file_path);
-    return csv_file;
-}
-
-// 创建下一个 run[i] 文件夹，并返回其路径
-int create_run_folder(const char *base_dir, char *run_folder_path, size_t size) {
-    char visualize_path[MAX_PATH_LEN];
-    snprintf(visualize_path, sizeof(visualize_path), "%s/visualize", base_dir);
-
-    // 创建 "visualize" 文件夹
-    if (create_folder(visualize_path) != 0) {
-        return -1;
-    }
-
-    // 查找现有的 run[i] 文件夹，找到最大的 i
-    DIR *dir = opendir(visualize_path);
-    if (dir == NULL) {
-        perror("opendir failed");
-        return -1;
-    }
-
-    struct dirent *entry;
-    int max_run = 0;
-
-    while ((entry = readdir(dir)) != NULL) {
-        if (strncmp(entry->d_name, "run", 3) == 0) {
-            int num = atoi(entry->d_name + 3); // 获取 run 后的数字部分
-            if (num > max_run) {
-                max_run = num;
-            }
+        // 文件不存在，创建新文件
+        *txt_file = fopen(full_file_path, "w+"); // 以读写模式创建文件
+        if (*txt_file == NULL) {
+            perror("Error creating new file");
+            return -1;
         }
     }
 
-    closedir(dir);
+    return 0; // 成功
+}
 
-    // 创建下一个 run[i] 文件夹
-    int next_run = max_run + 1;
-    snprintf(run_folder_path, size, "%s/run%d", visualize_path, next_run);
+// // 创建文件夹，如果文件夹已存在则不做任何操作
+// int create_folder(const char *folder_path) {
+//     struct stat st = {0};
 
-    if (create_folder(run_folder_path) != 0) {
-        return -1;
+//     if (stat(folder_path, &st) == -1) {
+//         if (mkdir(folder_path, 0755) == -1) {
+//             perror("Failed to create folder");
+//             return -1;
+//         } else {
+//             printf("Created folder: %s\n", folder_path);
+//         }
+//     } else {
+//         printf("Folder already exists: %s\n", folder_path);
+//     }
+
+//     return 0;
+// }
+
+// // 创建 CSV 文件，并返回文件指针
+// FILE* create_csv_in_folder(const char *folder_path, const char *csv_name) {
+//     char file_path[MAX_PATH_LEN];
+
+//     // 构造文件的完整路径
+//     if (snprintf(file_path, sizeof(file_path), "%s/%s.csv", folder_path, csv_name) >= sizeof(file_path)) {
+//         fprintf(stderr, "File path too long: %s/%s.csv\n", folder_path, csv_name);
+//         return NULL;
+//     }
+
+//     // 创建 CSV 文件
+//     FILE *csv_file = fopen(file_path, "w");
+//     if (csv_file == NULL) {
+//         perror("Failed to create CSV file");
+//         return NULL;
+//     }
+
+//     printf("Created CSV file: %s\n", file_path);
+//     return csv_file;
+// }
+
+// // 创建下一个 run[i] 文件夹，并返回其路径
+// int create_run_folder(const char *base_dir, char *run_folder_path, size_t size) {
+//     char visualize_path[MAX_PATH_LEN];
+//     snprintf(visualize_path, sizeof(visualize_path), "%s/visualize", base_dir);
+
+//     // 创建 "visualize" 文件夹
+//     if (create_folder(visualize_path) != 0) {
+//         return -1;
+//     }
+
+//     // 查找现有的 run[i] 文件夹，找到最大的 i
+//     DIR *dir = opendir(visualize_path);
+//     if (dir == NULL) {
+//         perror("opendir failed");
+//         return -1;
+//     }
+
+//     struct dirent *entry;
+//     int max_run = 0;
+
+//     while ((entry = readdir(dir)) != NULL) {
+//         if (strncmp(entry->d_name, "run", 3) == 0) {
+//             int num = atoi(entry->d_name + 3); // 获取 run 后的数字部分
+//             if (num > max_run) {
+//                 max_run = num;
+//             }
+//         }
+//     }
+
+//     closedir(dir);
+
+//     // 创建下一个 run[i] 文件夹
+//     int next_run = max_run + 1;
+//     snprintf(run_folder_path, size, "%s/run%d", visualize_path, next_run);
+
+//     if (create_folder(run_folder_path) != 0) {
+//         return -1;
+//     }
+
+//     return 0;
+// }
+
+// // 创建 CSV 文件并返回其路径
+// int visual_create_run_file(char *csv_folder_path, const char *csv_names[], int num_csv_names, FILE *csv_files[]) {
+//     // 创建下一个 run[i] 文件夹
+//     if (create_run_folder(csv_folder_path, csv_folder_path, MAX_PATH_LEN) != 0) {
+//         return -1;
+//     }
+
+//     // 为每个 CSV 名称创建文件
+//     for (int i = 0; i < num_csv_names; i++) {
+//         csv_files[i] = create_csv_in_folder(csv_folder_path, csv_names[i]);
+//         if (csv_files[i] == NULL) {
+//             return -1;
+//         }
+//     }
+
+//     return 0;
+// }
+
+// 辅助函数：检查目录是否存在，如果不存在则创建
+int ensure_directory_exists(const char *path) {
+    struct stat st;
+    if (stat(path, &st) == 0) {
+        if (S_ISDIR(st.st_mode)) {
+            return 0; // 目录已存在
+        } else {
+            fprintf(stderr, "Error: %s exists but is not a directory\n", path);
+            return -1;
+        }
     }
 
+    // 目录不存在，尝试创建
+    if (mkdir(path, 0755) != 0) {
+        perror("Error creating directory");
+        return -1;
+    }
     return 0;
 }
 
-// 创建 CSV 文件并返回其路径
+// 辅助函数：在指定目录中创建 CSV 文件
+FILE *create_csv_in_folder(const char *folder_path, const char *csv_name) {
+    char csv_path[MAX_PATH_LEN];
+    snprintf(csv_path, MAX_PATH_LEN, "%s/%s", folder_path, csv_name);
+
+    FILE *file = fopen(csv_path, "a"); // 使用 "a" 模式，文件不存在时会创建
+    if (file == NULL) {
+        perror("Error creating CSV file");
+    }
+    return file;
+}
+
+// 主函数：创建 run 文件夹并管理 CSV 文件
 int visual_create_run_file(char *csv_folder_path, const char *csv_names[], int num_csv_names, FILE *csv_files[]) {
-    // 创建下一个 run[i] 文件夹
-    if (create_run_folder(csv_folder_path, csv_folder_path, MAX_PATH_LEN) != 0) {
+    char run_folder_path[MAX_PATH_LEN];
+    snprintf(run_folder_path, MAX_PATH_LEN, "%s/visualize/run", csv_folder_path);
+
+    // 确保 run 文件夹存在
+    if (ensure_directory_exists(run_folder_path) != 0) {
         return -1;
     }
 
-    // 为每个 CSV 名称创建文件
+    // 遍历 csv_names，创建 CSV 文件并关联到 csv_files
     for (int i = 0; i < num_csv_names; i++) {
-        csv_files[i] = create_csv_in_folder(csv_folder_path, csv_names[i]);
+        csv_files[i] = create_csv_in_folder(run_folder_path, csv_names[i]);
         if (csv_files[i] == NULL) {
+            fprintf(stderr, "Error: Failed to create or open %s/%s\n", run_folder_path, csv_names[i]);
             return -1;
         }
     }
 
     return 0;
 }
+
 
 /*---------------------IO部分----------------------------------*/
 #define MAX_DEVICES 256
@@ -353,6 +441,10 @@ int process_disk_stats(DiskStatsContext* context, DiskStats* current, int* devic
 }
 
 /*-------------------------------网络部分----------------------------------------*/
+const char *proc_net_save = "/home/ne0/sys_competition/start/cpu_watcher/visualize/proc";
+FILE *proc_net_file = NULL; 
+FILE *sys_net_file = NULL;
+
 // 网络接口统计结构体
 typedef struct {
     char name[32];
@@ -372,13 +464,65 @@ static inline void safe_fclose(FILE *fp) {
     }
 }
 
+// 初始化 CSV 文件
+void init_proc_net_csv_file() {
+    char file_path[256];
+    snprintf(file_path, sizeof(file_path), "%s/net.csv", proc_net_save);
+
+    // 检查文件是否存在
+    bool write_header = (access(file_path, F_OK) != 0);
+
+    // 在这里打开文件，避免重复打开
+    sys_net_file = fopen("/proc/net/dev", "r");
+    if (!sys_net_file) {
+        perror("fopen");
+        exit(EXIT_FAILURE);
+    }
+
+    // 打开文件（追加模式）
+    proc_net_file = fopen(file_path, "a");
+    if (proc_net_file == NULL) {
+        perror("Error opening CSV file");
+        exit(EXIT_FAILURE);
+    }
+
+    // 如果文件是新建的，写入标题
+    if (write_header) {
+        fprintf(proc_net_file, "Interface,Bytes Received,Packets Received,Errs Rcv,Drops Rcv,"
+                               "Bytes Sent,Packets Sent,Errs Sent,Drops Sent\n");
+        fflush(proc_net_file);
+    }
+}
+
+void close_proc_net_csv_file() {
+    if (proc_net_file != NULL) {
+        fclose(proc_net_file);
+        proc_net_file = NULL;
+    }
+
+    if(sys_net_file != NULL){
+        fclose(sys_net_file);
+        sys_net_file = NULL;
+    }
+}
+
+// 写入数据到 CSV 文件
+void append_to_csv(const char *data) {
+    if (proc_net_file == NULL) {
+        fprintf(stderr, "Error: CSV file is not initialized\n");
+        exit(EXIT_FAILURE);
+    }
+    fprintf(proc_net_file, "%s", data);
+    //fflush(proc_net_file); 
+}
+
 // 读取 /proc/net/dev 文件，解析网络接口的统计信息
 int read_net_dev(NetDevStats **stats, int *count) {
-    FILE *fp = fopen("/proc/net/dev", "r");
-    if (!fp) {
-        perror("fopen");
-        return -1;
-    }
+    // FILE *fp = fopen("/proc/net/dev", "r");
+    // if (!fp) {
+    //     perror("fopen");
+    //     return -1;
+    // }
 
     char line[512];
     int line_num = 0;
@@ -387,11 +531,11 @@ int read_net_dev(NetDevStats **stats, int *count) {
     NetDevStats *dev_stats = malloc(max_devs * sizeof(NetDevStats));
     if (!dev_stats) {
         perror("malloc");
-        fclose(fp);
+        fclose(sys_net_file);
         return -1;
     }
 
-    while (fgets(line, sizeof(line), fp)) {
+    while (fgets(line, sizeof(line), sys_net_file)) {
         line_num++;
         // 跳过前两行标题
         if (line_num <= 2)
@@ -416,7 +560,7 @@ int read_net_dev(NetDevStats **stats, int *count) {
             if (!temp) {
                 perror("realloc");
                 free(dev_stats);
-                fclose(fp);
+                fclose(sys_net_file);
                 return -1;
             }
             dev_stats = temp;
@@ -449,7 +593,7 @@ int read_net_dev(NetDevStats **stats, int *count) {
         dev_index++;
     }
 
-    fclose(fp);
+    //fclose(fp);
     *stats = dev_stats;
     *count = dev_index;
     return 0;
@@ -528,11 +672,13 @@ int read_net_udp(int *udp_count) {
 }
 
 // 打印网络接口的统计信息
-void print_net_dev_stats(NetDevStats *stats, int count) {
+void print_net_dev_stats(NetDevStats *stats, int count,bool visualize) {
     printf("\n=== Network Interface Statistics ===\n");
     printf("%-10s %-15s %-15s %-10s %-10s %-15s %-15s %-10s %-10s\n", 
            "Interface", "Bytes Received", "Packets Received", "Errs Rcv", "Drops Rcv", 
            "Bytes Sent", "Packets Sent", "Errs Sent", "Drops Sent");
+    // 准备 CSV 数据字符串
+    char csv_data[4096] = {0};
     for (int i = 0; i < count; i++) {
         printf("%-10s %-15llu %-15llu %-10llu %-10llu %-15llu %-15llu %-10llu %-10llu\n",
                stats[i].name,
@@ -544,6 +690,24 @@ void print_net_dev_stats(NetDevStats *stats, int count) {
                stats[i].packets_sent,
                stats[i].errs_sent,
                stats[i].drop_sent);
+        if(visualize){
+            char line[512];
+            snprintf(line, sizeof(line), "%s,%llu,%llu,%llu,%llu,%llu,%llu,%llu,%llu\n",
+                 stats[i].name,
+                 stats[i].bytes_recv,
+                 stats[i].packets_recv,
+                 stats[i].errs_recv,
+                 stats[i].drop_recv,
+                 stats[i].bytes_sent,
+                 stats[i].packets_sent,
+                 stats[i].errs_sent,
+                 stats[i].drop_sent);
+            strcat(csv_data, line);
+        }
+    }
+    // 如果需要写入 CSV 文件
+    if (visualize && proc_net_file != NULL) {
+        append_to_csv(csv_data); // 追加数据到全局 CSV 文件
     }
 }
 
@@ -566,11 +730,14 @@ void free_net_dev_stats(NetDevStats *stats) {
 }
 
 // 监控网络
-int monitor_network() {
+int monitor_network(bool visualize) {
     NetDevStats *dev_stats = NULL;
     int dev_count = 0;
     int tcp_count = 0;
     int udp_count = 0;
+
+    if(visualize)
+        init_proc_net_csv_file();
 
     // 读取网络接口统计
     if (read_net_dev(&dev_stats, &dev_count) != 0) {
@@ -593,7 +760,7 @@ int monitor_network() {
     }
 
     // 打印统计信息
-    print_net_dev_stats(dev_stats, dev_count);
+    print_net_dev_stats(dev_stats, dev_count,visualize);
     print_tcp_count(tcp_count);
     print_udp_count(udp_count);
 
@@ -602,5 +769,73 @@ int monitor_network() {
 
     return 0;
 }
+
+
+/*------------------------------mm部分----------------------------------------*/
+#define MEMINFO_PATH "/proc/meminfo"
+#define MM_INTERVAL 1  // 定时读取的间隔时间（秒）
+
+FILE *open_meminfo() {
+    FILE *file = fopen(MEMINFO_PATH, "r");
+    if (!file) {
+        perror("Failed to open /proc/meminfo");
+        exit(EXIT_FAILURE);
+    }
+    return file;
+}
+
+void read_meminfo(FILE *file) {
+    rewind(file);
+
+    char key[256];
+    unsigned long value;
+    unsigned long mem_total = 0, mem_free = 0, mem_available = 0, buffers = 0, cached = 0;
+    unsigned long swap_total = 0, swap_free = 0, committed_as = 0, commit_limit = 0;
+
+    while (fscanf(file, "%255[^:]: %lu kB\n", key, &value) == 2) {
+        if (strcmp(key, "MemTotal") == 0) {
+            mem_total = value;
+        } else if (strcmp(key, "MemFree") == 0) {
+            mem_free = value;
+        } else if (strcmp(key, "MemAvailable") == 0) {
+            mem_available = value;
+        } else if (strcmp(key, "Buffers") == 0) {
+            buffers = value;
+        } else if (strcmp(key, "Cached") == 0) {
+            cached = value;
+        } else if (strcmp(key, "SwapTotal") == 0) {
+            swap_total = value;
+        } else if (strcmp(key, "SwapFree") == 0) {
+            swap_free = value;
+        } else if (strcmp(key, "Committed_AS") == 0) {
+            committed_as = value;
+        } else if (strcmp(key, "CommitLimit") == 0) {
+            commit_limit = value;
+        }
+    }
+
+    unsigned long used_memory = mem_total - mem_free;
+    unsigned long used_swap = swap_total - swap_free;
+    double used_memory_percent = (mem_total > 0) ? (100.0 * used_memory / mem_total) : 0.0;
+    double available_memory_percent = (mem_total > 0) ? (100.0 * mem_available / mem_total) : 0.0;
+    double used_swap_percent = (swap_total > 0) ? (100.0 * used_swap / swap_total) : 0.0;
+    double commit_percent = (commit_limit > 0) ? (100.0 * committed_as / commit_limit) : 0.0;
+
+    printf("\n--- Memory Usage ---\n");
+    printf("Total Memory: %lu kB\n", mem_total);
+    printf("Used Memory: %lu kB (%.2f%%)\n", used_memory, used_memory_percent);
+    printf("Available Memory: %lu kB (%.2f%%)\n", mem_available, available_memory_percent);
+    printf("Buffers: %lu kB\n", buffers);
+    printf("Cached: %lu kB\n", cached);
+
+    printf("\n--- Swap Memory ---\n");
+    printf("Total Swap: %lu kB\n", swap_total);
+    printf("Used Swap: %lu kB (%.2f%%)\n", used_swap, used_swap_percent);
+
+    printf("\n--- Memory Commitment ---\n");
+    printf("Commit Limit: %lu kB\n", commit_limit);
+    printf("Committed AS: %lu kB (%.2f%%)\n", committed_as, commit_percent);
+}
+
 
 #endif
