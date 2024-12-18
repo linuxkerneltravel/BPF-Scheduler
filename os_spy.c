@@ -2519,22 +2519,22 @@ static int attach_cpu_skel(struct cpu_stats_bpf *skel){
         return 1;
     }
 
-    struct data_list list = {};
-    map_fd = bpf_map__fd(skel->maps.occupied_list);
-    if(bpf_map_update_elem(map_fd,&zero,&list,BPF_ANY)!=0 || bpf_map_update_elem(map_fd,&one,&list,BPF_ANY)!=0){
-        perror("Failed to init occupied_liss");
-        cpu_stats_bpf__destroy(skel);
-        return 1;
-    }
+    // struct data_list list = {};
+    // map_fd = bpf_map__fd(skel->maps.occupied_list);
+    // if(bpf_map_update_elem(map_fd,&zero,&list,BPF_ANY)!=0 || bpf_map_update_elem(map_fd,&one,&list,BPF_ANY)!=0){
+    //     perror("Failed to init occupied_liss");
+    //     cpu_stats_bpf__destroy(skel);
+    //     return 1;
+    // }
 
-    struct hash_table table;
-    hash_table_init(&table);
-    map_fd = bpf_map__fd(skel->maps.hash_table_model_map);
-    if(bpf_map_update_elem(map_fd,&zero,&table,BPF_ANY) != 0){
-        perror("Failed to update hash_table_model_map");
-        cpu_stats_bpf__destroy(skel);
-        return 1;
-    }
+    // struct hash_table table;
+    // hash_table_init(&table);
+    // map_fd = bpf_map__fd(skel->maps.hash_table_model_map);
+    // if(bpf_map_update_elem(map_fd,&zero,&table,BPF_ANY) != 0){
+    //     perror("Failed to update hash_table_model_map");
+    //     cpu_stats_bpf__destroy(skel);
+    //     return 1;
+    // }
 
     err = cpu_stats_bpf__attach(skel);
     if (err) {
@@ -2548,17 +2548,17 @@ static int attach_cpu_skel(struct cpu_stats_bpf *skel){
     }
     skel->links.handle_cpu_event = link_cpu;
 
-    struct bpf_link *link_task = attach_perf_event_to_program(skel->progs.handle_task_usage_event, 500);  // 500 毫秒
-    if (!link_task) {
-        return err;
-    }
-    skel->links.handle_task_usage_event = link_task;
+    // struct bpf_link *link_task = attach_perf_event_to_program(skel->progs.handle_task_usage_event, 500);  // 500 毫秒
+    // if (!link_task) {
+    //     return err;
+    // }
+    // skel->links.handle_task_usage_event = link_task;
 
-    struct bpf_link *link_process = attach_perf_event_to_program(skel->progs.handle_process_stat_event,500);
-    if(!link_process){
-        return err;
-    }
-    skel->links.handle_process_stat_event = link_process;
+    // struct bpf_link *link_process = attach_perf_event_to_program(skel->progs.handle_process_stat_event,500);
+    // if(!link_process){
+    //     return err;
+    // }
+    // skel->links.handle_process_stat_event = link_process;
 
     struct bpf_link *link_runqlat = attach_perf_event_to_program(skel->progs.handle_sys_latency_event,500);
     if(!link_runqlat){
@@ -2566,10 +2566,10 @@ static int attach_cpu_skel(struct cpu_stats_bpf *skel){
     }
     skel->links.handle_sys_latency_event = link_runqlat;
 
-    struct bpf_link *link_backtrace = attach_perf_event_to_program(skel->progs.handle_task_backtrace_event,500);
-    if(!link_backtrace){
-        return err;
-    }
+    // struct bpf_link *link_backtrace = attach_perf_event_to_program(skel->progs.handle_task_backtrace_event,500);
+    // if(!link_backtrace){
+    //     return err;
+    // }
 
     rb_cpu = ring_buffer__new(bpf_map__fd(skel->maps.cpu_usage_buffer), handle_cpu_usage_event, NULL, NULL);
     if (!rb_cpu) {

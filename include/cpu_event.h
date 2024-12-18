@@ -6,7 +6,6 @@
 #define CPU_EVENT_H
 
 #include "sys_event.h"
-#include "hash_table.h"
 
 
 #define MAX_CPU_NR 64
@@ -96,12 +95,14 @@ struct process_struct{
     u32 tgid;
     //struct hash_table kids;
     u32 kids_length;
+    bool already_output;
 
     u64 last_total_clear;
     u64 last_lock_clear;
 
     u64 total_use_time;
     u64 lock_time;
+    u64 last_clear_time;
 
     u32 total_use_percent;
 };
@@ -122,9 +123,10 @@ struct runqlat_perf_data{
 struct task_cpu_usage {
     struct  task_info_simple task_info;
 
-    bool already_backtrace;
+    //bool already_backtrace;
     bool in_kernel;
     bool in_process;
+    bool already_output;
 
     u64 user_time_ns;       
     u64 kernel_time_ns;     
@@ -133,6 +135,8 @@ struct task_cpu_usage {
     u64 last_enqeue_time;
 
     u64 wait_time;
+    u64 last_clear_time;
+    u64 last_trace_time;
 
     u32 user_percent;       
     u32 kernel_percent;     

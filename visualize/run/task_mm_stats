@@ -26,3 +26,11 @@ PID,Command,Kmem Count,Vmem Count,Slab Count
 3863,Xorg,500,2,60
 12503,os_spy,500,0,1
 3863,Xorg,500,1,54
+30750,os_spy,500,0,6
+3863,Xorg,500,2,64
+30750,os_spy,500,0,1
+3863,Xorg,500,1,70
+4601,code,0,500,16
+3863,Xorg,500,1,64
+30750,os_spy,500,0,1
+3863,Xorg,500,0,54

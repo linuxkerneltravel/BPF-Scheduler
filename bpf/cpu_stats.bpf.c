@@ -44,14 +44,14 @@ struct cpu_idle_args{
 
 
 
-static struct hash_table template_table;
+//static struct hash_table template_table;
 
 // 栈回溯的
 DEFINE_BPF_MAP(stack_traces_map,BPF_MAP_TYPE_STACK_TRACE,2048,u32,(MAX_STACK_DEPTH*sizeof(u64)));
 DEFINE_BPF_MAP(task_trace_data_map,BPF_MAP_TYPE_HASH,1024,u32,struct task_trace_event);
 
 // 初始化的hash_table的模板，在用户态定义
-DEFINE_BPF_MAP(hash_table_model_map,BPF_MAP_TYPE_ARRAY,1,u32,struct hash_table);
+// DEFINE_BPF_MAP(hash_table_model_map,BPF_MAP_TYPE_ARRAY,1,u32,struct hash_table);
 
 // 用来传递一些用户空间的数据
 DEFINE_BPF_MAP(cpu_usr_map,BPF_MAP_TYPE_ARRAY,16,u32,u32);
@@ -68,11 +68,11 @@ DEFINE_BPF_MAP(cpu_ema_ctrl_map,BPF_MAP_TYPE_ARRAY,4,u32,struct ema_para);
 DEFINE_BPF_MAP(task_cpu_usage_map,BPF_MAP_TYPE_HASH,MAX_ENTRIES,u32,struct task_cpu_usage);
 DEFINE_BPF_MAP(process_map,BPF_MAP_TYPE_HASH,MAX_PROCESS_ENTRIES,u32,struct process_struct);
 
-DEFINE_BPF_MAP(process_kids_map,BPF_MAP_TYPE_HASH,MAX_PROCESS_ENTRIES,u32,struct hash_table);
+//DEFINE_BPF_MAP(process_kids_map,BPF_MAP_TYPE_HASH,MAX_PROCESS_ENTRIES,u32,struct hash_table);
 
 DEFINE_BPF_MAP(thread_occupied_map,BPF_MAP_TYPE_HASH,512,u32,u32);
 DEFINE_BPF_MAP(process_occupied_map,BPF_MAP_TYPE_HASH,256,u32,u32);
-DEFINE_BPF_MAP(occupied_list,BPF_MAP_TYPE_ARRAY,2,u32,struct data_list);
+//DEFINE_BPF_MAP(occupied_list,BPF_MAP_TYPE_ARRAY,2,u32,struct data_list);
 
 // 任务延迟计数统计
 // 对数增长,8个区间
@@ -86,12 +86,12 @@ struct {
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __uint(max_entries, 128 * 1024);  // 环形缓冲区大小为 128 KB
+    __uint(max_entries, 512 * 1024);  // 环形缓冲区大小为 128 KB
 } task_occupied_buffer SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __uint(max_entries, 64 * 1024);  // 环形缓冲区大小为 64 KB
+    __uint(max_entries, 512 * 1024);  // 环形缓冲区大小为 64 KB
 } process_occupied_buffer SEC(".maps");
 
 struct {
@@ -132,111 +132,145 @@ static struct task_info_simple init_task_info(struct task_struct *p,u32 cpu_id){
     return info;
 }
 
-static int update_data_list(u32 list_id,u32 id,u32 operation){
-    //bpf_printk("task occupied id is %u",id);
-    if(id == 0)
+static int perf_task_backtrace(u32 pid){
+    u64 now = bpf_ktime_get_ns();
+    struct task_trace_event *task;
+    if(pid == 0)
         return 0;
-    if(list_id == 0 || list_id == 1){
-        // operation 0 delete, 1 insert
-        if(operation == 0){
-            struct data_list *list = bpf_map_lookup_elem(&occupied_list,&list_id);
-            if(!list){
-                // struct data_list _list = {};
-                // bpf_map_update_elem(&occupied_list,&list_id,&_list,BPF_ANY);
-                bpf_printk("data list not init\n");
-                return 0;
-            }
-            for(int i=0;i<50;i++){
-                if(list->list[i] == id)
-                {
-                    list->list[i] = 0;
-                    bpf_map_update_elem(&occupied_list,&list_id,list,BPF_ANY);
-                    break;
-                }
-            }
-        }
-        else if(operation == 1){
-            struct data_list *list = bpf_map_lookup_elem(&occupied_list,&list_id);
-            if(!list){
-                // struct data_list _list = {};
-                // bpf_map_update_elem(&occupied_list,&list_id,&_list,BPF_ANY);
-                // list = bpf_map_lookup_elem(&occupied_list,&list_id);
-                // if(!list)
-                bpf_printk("data list not init\n");
-                return 0;
-            }
-            for(int i=0;i<50;i++){
-                if(list->list[i] == 0){
-                    list->list[i] = id;
-                    //bpf_printk("task occupied id is %u",id);
-                    bpf_map_update_elem(&occupied_list,&list_id,list,BPF_ANY);
-                    break;
-                }
-            }
-        }
-        else{
-            bpf_printk("data_list operations id error\n");
-        }
+    task = bpf_map_lookup_elem(&task_trace_data_map,&pid);
+    if(!task)
+        return 0;
+    
+    struct task_trace_event *buff = bpf_ringbuf_reserve(&task_backtrace_buffer,sizeof(struct task_trace_event),0);
+    if(!buff){
+        bpf_printk("backtrace buff allocate failed\n");
+        return 0;
     }
-    else{
-        bpf_printk("data_list id error\n");
+    memset(buff,0,sizeof(struct task_trace_event));
+    buff->pid = pid;
+    bpf_probe_read_str(buff->comm,sizeof(task->comm),task->comm);
+    buff->kstack_sz = task->kstack_sz;
+    buff->ustack_sz = task->ustack_sz;
+    for(int j=0;j<MAX_STACK_DEPTH;j++){
+            if(j > task->kstack_sz)
+                break;
+            buff->k_stack[j] = task->k_stack[j];
     }
+    for(int j=0;j<MAX_STACK_DEPTH;j++){
+            if(j > task->ustack_sz)
+                    break;
+            buff->u_stack[j] = task->u_stack[j];
+        }
+    bpf_ringbuf_submit(buff, 0);
+
     return 0;
 }
 
-static int hash_table_insert(struct hash_table *table, unsigned int key) {
-    unsigned int hash_index = hash_func(key);
-    if(hash_index >= HASH_TABLE_SIZE)
-        return (unsigned int)-1;
-    unsigned int count = table->counts[hash_index];
-    if(hash_table_lookup(table,key,false) == key){
-        return 1;// 防止重复插入
-    }
+// static int update_data_list(u32 list_id,u32 id,u32 operation){
+//     //bpf_printk("task occupied id is %u",id);
+//     if(id == 0)
+//         return 0;
+//     if(list_id == 0 || list_id == 1){
+//         // operation 0 delete, 1 insert
+//         if(operation == 0){
+//             struct data_list *list = bpf_map_lookup_elem(&occupied_list,&list_id);
+//             if(!list){
+//                 // struct data_list _list = {};
+//                 // bpf_map_update_elem(&occupied_list,&list_id,&_list,BPF_ANY);
+//                 bpf_printk("data list not init\n");
+//                 return 0;
+//             }
+//             for(int i=0;i<50;i++){
+//                 if(list->list[i] == id)
+//                 {
+//                     list->list[i] = 0;
+//                     bpf_map_update_elem(&occupied_list,&list_id,list,BPF_ANY);
+//                     break;
+//                 }
+//             }
+//         }
+//         else if(operation == 1){
+//             struct data_list *list = bpf_map_lookup_elem(&occupied_list,&list_id);
+//             if(!list){
+//                 // struct data_list _list = {};
+//                 // bpf_map_update_elem(&occupied_list,&list_id,&_list,BPF_ANY);
+//                 // list = bpf_map_lookup_elem(&occupied_list,&list_id);
+//                 // if(!list)
+//                 bpf_printk("data list not init\n");
+//                 return 0;
+//             }
+//             for(int i=0;i<50;i++){
+//                 if(list->list[i] == 0){
+//                     list->list[i] = id;
+//                     //bpf_printk("task occupied id is %u",id);
+//                     bpf_map_update_elem(&occupied_list,&list_id,list,BPF_ANY);
+//                     break;
+//                 }
+//             }
+//         }
+//         else{
+//             bpf_printk("data_list operations id error\n");
+//         }
+//     }
+//     else{
+//         bpf_printk("data_list id error\n");
+//     }
+//     return 0;
+// }
 
-    // bpf_printk("task id is %u",key);
-    if (count < MAX_COLLISIONS) {
-        table->hash_node[hash_index][count] = key;
-        table->counts[hash_index]++;
-        if(hash_index > table->last_valid_index)
-            table->last_valid_index = hash_index;
-    } else {
-        return -1;
-    }
-    //bpf_printk("task id is %u",key);
-    return 0;
-}
+// static int hash_table_insert(struct hash_table *table, unsigned int key) {
+//     unsigned int hash_index = hash_func(key);
+//     if(hash_index >= HASH_TABLE_SIZE)
+//         return (unsigned int)-1;
+//     unsigned int count = table->counts[hash_index];
+//     if(hash_table_lookup(table,key,false) == key){
+//         return 1;// 防止重复插入
+//     }
+
+//     // bpf_printk("task id is %u",key);
+//     if (count < MAX_COLLISIONS) {
+//         table->hash_node[hash_index][count] = key;
+//         table->counts[hash_index]++;
+//         if(hash_index > table->last_valid_index)
+//             table->last_valid_index = hash_index;
+//     } else {
+//         return -1;
+//     }
+//     //bpf_printk("task id is %u",key);
+//     return 0;
+// }
 
 static int init_process(u32 tgid,u32 pid) {
     struct process_struct ps;
     //hash_table_init(&ps.kids); 
-    struct hash_table *table = bpf_map_lookup_elem(&hash_table_model_map,&zero);
-    if(!table)
-        return -1;
+    // struct hash_table *table = bpf_map_lookup_elem(&hash_table_model_map,&zero);
+    // if(!table)
+    //     return -1;
     
     //bpf_probe_read_kernel(&template_table,sizeof(template_table),table);
 
-    int res = bpf_map_update_elem(&process_kids_map,&tgid,table,BPF_ANY);
+    //int res = bpf_map_update_elem(&process_kids_map,&tgid,table,BPF_ANY);
     //int res = bpf_map_update_elem(&process_kids_map,&tgid,&template_table,BPF_ANY);
-    if(res < 0){
-        bpf_printk("process %u kids map init failed,error code is %i",tgid,res);
-    }
+    // if(res < 0){
+    //     bpf_printk("process %u kids map init failed,error code is %i",tgid,res);
+    // }
 
-    table = bpf_map_lookup_elem(&process_kids_map,&tgid);
-    if(!table)
-    {
-        bpf_printk("process %u kids map init failed",tgid);
-        return -1;
-    }
+    // table = bpf_map_lookup_elem(&process_kids_map,&tgid);
+    // if(!table)
+    // {
+    //     bpf_printk("process %u kids map init failed",tgid);
+    //     return -1;
+    // }
     
     ps.tgid = tgid;
     ps.kids_length = 1;
-    hash_table_insert(table,pid); 
+    //hash_table_insert(table,pid); 
     if(tgid != pid)
     {
-        hash_table_insert(table,tgid);
+        //hash_table_insert(table,tgid);
         ps.kids_length = 2;
     }
-    bpf_map_update_elem(&process_kids_map,&tgid,table,BPF_ANY);
+    //bpf_map_update_elem(&process_kids_map,&tgid,table,BPF_ANY);
     bpf_map_update_elem(&process_map,&tgid,&ps,BPF_ANY);
     return 0;
 }
@@ -250,19 +284,8 @@ static void insert_pid_to_process(u32 tgid,u32 pid){
         init_process(tgid,pid);
         }
     else{
-        struct hash_table *table = bpf_map_lookup_elem(&process_kids_map,&tgid);
-        if(!table)
-            bpf_printk("process %u find kids map error\n",tgid);
-        else{
-            int res = hash_table_insert(table,pid);
-            if(res == 0){
-                ps->kids_length++;
-            }else if(res == -1){
-                bpf_printk("The process_struct %u table is full, please enlarge the bucket\n",tgid);
-            }
-            bpf_map_update_elem(&process_map,&tgid,ps,BPF_ANY);
-            bpf_map_update_elem(&process_kids_map,&tgid,table,BPF_ANY);
-        }        
+        ps->kids_length += 1;
+        bpf_map_update_elem(&process_map,&tgid,ps,BPF_ANY);
     }
 }
 
@@ -277,10 +300,9 @@ int BPF_PROG(handle_sched_wakeup, struct task_struct *p)
     struct task_cpu_usage *task_use = bpf_map_lookup_elem(&task_cpu_usage_map,&pid);
     if(!task_use){
         struct task_info_simple info = init_task_info(p,cpu_id);
-        struct task_cpu_usage init_task = {
-                .task_info = info,
-                .in_kernel = false
-            };
+        struct task_cpu_usage init_task;
+        memset(&init_task,0,sizeof(struct task_cpu_usage));
+        init_task.task_info = info;
         init_task.last_enqeue_time = bpf_ktime_get_ns();
         bpf_map_update_elem(&task_cpu_usage_map, &pid, &init_task, BPF_ANY);
         insert_pid_to_process(tgid,pid);
@@ -303,10 +325,9 @@ int BPF_PROG(handle_sched_wakeup_new, struct task_struct *p){
     struct task_cpu_usage *task_use = bpf_map_lookup_elem(&task_cpu_usage_map,&pid);
     if(!task_use){
         struct task_info_simple info = init_task_info(p,cpu_id);
-        struct task_cpu_usage init_task = {
-                .task_info = info,
-                .in_kernel = false
-            };
+        struct task_cpu_usage init_task;
+        memset(&init_task,0,sizeof(struct task_cpu_usage));
+        init_task.task_info = info;
         init_task.last_enqeue_time = bpf_ktime_get_ns();
         bpf_map_update_elem(&task_cpu_usage_map, &pid, &init_task, BPF_ANY);
         
@@ -326,15 +347,14 @@ int handle_task_create(struct trace_event_raw_sched_process_fork *ctx){
     u32 cpu_id = bpf_get_smp_processor_id();
     struct task_cpu_usage *tk = bpf_map_lookup_elem(&task_cpu_usage_map,&pid_new);
     if(!tk){
+        struct task_cpu_usage init_task;
+        memset(&init_task,0,sizeof(struct task_cpu_usage));
         struct task_info_simple info = {
                 .pid = pid_new,
                 .cpu_id = cpu_id
             };
         bpf_probe_read_kernel_str(info.comm,sizeof(ctx->child_comm),ctx->child_comm);
-        struct task_cpu_usage init_task = {
-            .task_info = info,
-            .in_kernel = false
-        };
+        init_task.task_info = info;
         bpf_map_update_elem(&task_cpu_usage_map,&pid_new,&init_task,BPF_ANY);
     }
     return 0;
@@ -350,27 +370,14 @@ int BPF_PROG(handle_task_exit){
 
     bpf_map_delete_elem(&task_cpu_usage_map,&pid);
     struct process_struct *ps = bpf_map_lookup_elem(&process_map,&tgid);
-    if(!ps){
-        struct hash_table *table = bpf_map_lookup_elem(&process_kids_map,&tgid);
-        if(!table)
-        {
-            bpf_printk("process %u find kids map error\n",tgid);
-        }
-        else{
-            int res = hash_table_delete(table,pid);
-            if(res == 0){
-                if (ps!=NULL) {
-                    ps->kids_length--;
-                    bpf_map_update_elem(&process_map,&tgid,ps,BPF_ANY);
-                }
-            }
-            bpf_map_update_elem(&process_kids_map,&tgid,table,BPF_ANY);
-        }
+    if(ps != NULL){
+        if(ps->kids_length > 0)
+            ps->kids_length -= 1;
 
         u32 *in = bpf_map_lookup_elem(&thread_occupied_map,&pid);
         if(in != NULL){
             bpf_map_delete_elem(&thread_occupied_map,&pid);
-            update_data_list(zero,pid,zero);
+            //update_data_list(zero,pid,zero);
         }
 
         bpf_map_delete_elem(&task_trace_data_map,&pid);
@@ -378,7 +385,7 @@ int BPF_PROG(handle_task_exit){
         if(ps!=NULL && ps->kids_length == 0)
         {
             bpf_map_delete_elem(&process_map,&tgid);
-            bpf_map_delete_elem(&process_kids_map,&tgid);
+            //bpf_map_delete_elem(&process_kids_map,&tgid);
 
             // if(bpf_map_lookup_elem(&process_occupied_map,&zero)!= NULL)
             // {
@@ -390,14 +397,14 @@ int BPF_PROG(handle_task_exit){
             //     }
             //     if(hash_table_delete(table,tgid) == 0)
             //     {
-            //         bpf_map_update_elem(&process_occupied_map,&zero,table,BPF_ANY);
+            //         bpf_map_update_elem(&process_occu pied_map,&zero,table,BPF_ANY);
             //         update_data_list(one,tgid,zero);
             //     }
             // }
             in = bpf_map_lookup_elem(&process_occupied_map,&tgid);
             if(in != NULL){
                 bpf_map_delete_elem(&process_occupied_map,&tgid);
-                update_data_list(one,tgid,zero);
+                //update_data_list(one,tgid,zero);
             }
         }
         // else
@@ -410,27 +417,53 @@ static int task_concerned_update(struct task_cpu_usage *task_usage, u32 threshol
     u32 value = task_usage->total_time_ns * 100 / HALF_SECOND;
     //bpf_printk("total percent is %u",value);
     //bpf_printk("task id is %u",task_usage->task_info.pid);
-    if(value >= 5)
+    u32 pid = task_usage->task_info.pid;
+    u64 now = bpf_ktime_get_ns();
+    if(task_usage->last_clear_time == 0)
     {
-        u32 pid = task_usage->task_info.pid;
-        //bpf_printk("task id is %u",pid);
-        // struct hash_table *table = bpf_map_lookup_elem(&thread_occupied_map,&zero);
-        // if(!table)
-        // {
-        //     bpf_printk("hash table task not init\n");
-        //     return -1;
-        // }
-        // //bpf_printk("task id is %u",pid);
-        // int res = hash_table_insert(table,pid);
-        // //bpf_printk("res is %d",res);
-        // if(res == 0)
-        // {
-        //     //bpf_printk("total percent is %u",value);
-        //     bpf_map_update_elem(&thread_occupied_map,&zero,table,BPF_ANY);
-        //     update_data_list(zero,pid,one);
-        // }
-        update_data_list(zero,pid,one);
+        task_usage->last_clear_time = now;
+        bpf_map_update_elem(&task_cpu_usage_map,&pid,task_usage,BPF_ANY);
+        return 0;
+    }
+    if(!task_usage->already_output && value >= threshold && now - task_usage->last_clear_time < HALF_SECOND)
+    {
         bpf_map_update_elem(&thread_occupied_map,&pid,&pid,BPF_ANY);
+
+        struct task_cpu_usage *buff = bpf_ringbuf_reserve(&task_occupied_buffer,sizeof(struct task_cpu_usage),0);
+        if(!buff){
+            bpf_printk("the task_cpu buffer is full\n");
+            return 0;
+        }
+        memset(buff,0,sizeof(struct task_cpu_usage));
+        buff->task_info = task_usage->task_info;
+        u64 delta = (now - task_usage->last_clear_time)*10 / HALF_SECOND;
+        buff->total_percent = task_usage->total_time_ns * 100 * delta/ HALF_SECOND;
+        buff->kernel_percent = task_usage->kernel_time_ns / task_usage->total_time_ns;
+        buff->user_percent = task_usage->user_time_ns / task_usage->total_time_ns;
+        bpf_ringbuf_submit(buff,0);
+        
+        task_usage->already_output = true;
+        //bpf_map_update_elem(&task_cpu_usage_map,&pid,task_usage,BPF_ANY);
+
+        if(task_usage->last_trace_time == 0 || now - task_usage->last_trace_time > 10 * HALF_SECOND)// 间隔至少5s
+        {
+            perf_task_backtrace(pid);
+            task_usage->last_trace_time = now;
+        }
+        bpf_map_update_elem(&task_cpu_usage_map,&pid,task_usage,BPF_ANY);
+    }
+    else{
+        if(now - task_usage->last_clear_time > HALF_SECOND)
+        {
+            if(task_usage->already_output == false)
+                bpf_map_delete_elem(&thread_occupied_map,&pid);
+            task_usage->last_clear_time = now;
+            task_usage->total_time_ns = 0;
+            task_usage->user_time_ns = 0;
+            task_usage->kernel_time_ns = 0;
+            task_usage->already_output = false;
+            bpf_map_update_elem(&task_cpu_usage_map,&pid,task_usage,BPF_ANY);
+        }
     }
     return 0;
 }
@@ -438,22 +471,42 @@ static int task_concerned_update(struct task_cpu_usage *task_usage, u32 threshol
 static int process_concerned_update(struct process_struct *ps, u32 threshold){
     //bpf_printk("process %u total use time is %lu \n",ps->tgid,ps->total_use_time);
     u32 value = ps->total_use_time * 100 / HALF_SECOND;
-    //bpf_printk("process %u total use time is %lu, total percent is %u \n",ps->tgid,ps->total_use_time,value);
-    //bpf_printk("total percent is %u",value);
-    //bpf_printk("current process is %u",ps->tgid);
-    if(value >= threshold)
+    u64 now = bpf_ktime_get_ns();
+    u32 tgid = ps->tgid;
+    if(ps->last_clear_time == 0){
+        ps->last_clear_time = now;
+        bpf_map_update_elem(&process_map,&tgid,ps,BPF_ANY);
+        return 0;
+    }
+    if(!ps->already_output && value >= threshold && now - ps->last_clear_time < HALF_SECOND)
     {
-        u32 tgid = ps->tgid;
-        // struct hash_table *table = bpf_map_lookup_elem(&process_occupied_map,&zero);
-        // if(!table)
-        //     return -1;
-        // if(hash_table_insert(table,tgid) == 0)
-        // {
-        //     bpf_map_update_elem(&process_occupied_map,&zero,table,BPF_ANY);
-        //     update_data_list(one,tgid,one);
-        // }
-        update_data_list(one,tgid,one);
         bpf_map_update_elem(&process_occupied_map,&tgid,&tgid,BPF_ANY);
+
+        struct process_struct *buff = bpf_ringbuf_reserve(&process_occupied_buffer,sizeof(struct process_struct),0);
+        if(!buff){
+            bpf_printk("process_cpu buffer is full\n");
+            return 0;
+        }
+        memset(buff,0,sizeof(struct process_struct));
+        u64 delta = (now - ps->last_clear_time) * 10 / HALF_SECOND;
+        buff->tgid = tgid;
+        buff->kids_length = ps->kids_length;
+        buff->total_use_percent = ps->total_use_time * 100 * delta / HALF_SECOND;
+        bpf_ringbuf_submit(buff,0);
+
+        ps->already_output = true;
+        bpf_map_update_elem(&process_map,&tgid,ps,BPF_ANY);
+    }
+    else{
+        if(now - ps->last_clear_time > HALF_SECOND)
+        {
+            if(ps->already_output == false)
+                bpf_map_delete_elem(&process_occupied_map,&tgid);
+            ps->last_clear_time = now;
+            ps->total_use_time = 0;
+            ps->already_output = false;
+            bpf_map_update_elem(&process_map,&tgid,ps,BPF_ANY);
+        }
     }
     return 0;
 }
@@ -515,16 +568,16 @@ int record_task_switch(struct trace_event_raw_sched_switch *ctx)
     if(prev_pid != 0){
         struct task_cpu_usage *pre_usage = bpf_map_lookup_elem(&task_cpu_usage_map, &prev_pid);
         if (!pre_usage) {
+            struct task_cpu_usage init_task;
+            memset(&init_task,0,sizeof(struct task_cpu_usage));
             struct task_info_simple info = {
                 .pid = prev_pid,
                 .cpu_id = cpu_id
             };
             bpf_probe_read_kernel_str(info.comm,sizeof(ctx->prev_comm),ctx->prev_comm);
-            struct task_cpu_usage init_task = {
-                .task_info = info,
-                .last_run_time = now,
-                .in_kernel = false
-            };
+            init_task.task_info = info;
+            init_task.last_clear_time = now;
+            init_task.last_run_time = now;
             bpf_map_update_elem(&task_cpu_usage_map, &prev_pid, &init_task, BPF_ANY);
         } else {
             pre_usage->task_info.pid = prev_pid;
@@ -558,16 +611,16 @@ int record_task_switch(struct trace_event_raw_sched_switch *ctx)
     if(next_pid != 0){
         struct task_cpu_usage *next_usage = bpf_map_lookup_elem(&task_cpu_usage_map, &next_pid);
         if (!next_usage) {
+            struct task_cpu_usage init_task;
+            memset(&init_task,0,sizeof(struct task_cpu_usage));
             struct task_info_simple info = {
                 .pid = next_pid,
                 .cpu_id = cpu_id
             };
             bpf_probe_read_kernel_str(info.comm,sizeof(ctx->next_comm),ctx->next_comm);
-            struct task_cpu_usage init_task = {
-                .task_info = info,
-                .last_run_time = now,
-                .in_kernel = false
-            };
+            init_task.task_info = info;
+            init_task.last_clear_time = now;
+            init_task.last_run_time = now;
             bpf_map_update_elem(&task_cpu_usage_map, &next_pid, &init_task, BPF_ANY);
         } else {
             next_usage->task_info.pid = next_pid;
@@ -647,8 +700,8 @@ int record_backtrace(struct trace_event_raw_sched_switch *ctx)
     }
     else{
         struct task_cpu_usage *use = bpf_map_lookup_elem(&task_cpu_usage_map,&pid);
-        if(!use || use->already_backtrace)
-            return 0;
+        // if(!use || use->already_backtrace)
+        //     return 0;
     }
     trace = bpf_map_lookup_elem(&task_trace_data_map,&pid);
     if(!trace)
@@ -985,185 +1038,136 @@ static int update_cpu_usage_percent(void){
     return 0;
 }
 
-// static unsigned int hash_table_foreach(struct hash_table *table, unsigned int key) {
-//     unsigned int hash_index = hash_func(key);
-//     if (hash_index >= HASH_TABLE_SIZE)
-//         return (unsigned int)-1; 
-
-//     if(table->last_valid_index >= HASH_TABLE_SIZE)
-//         table->last_valid_index = HASH_TABLE_SIZE - 1;
-//     unsigned int max_index = (table->last_valid_index + 1) * MAX_COLLISIONS;
-//     if(max_index > HASH_LIST_LENGTH)
-//         max_index = HASH_LIST_LENGTH;
-//     unsigned int current_index = hash_index * MAX_COLLISIONS; // 从 key 的哈希槽起始位置开始
-//     if(current_index > HASH_LIST_LENGTH)
-//         return (unsigned int)-1; 
-
-//     unsigned int value = (unsigned int)-1;
-//     int found = 0; // 标记是否找到当前 key
-
-//     //#pragma unroll
-//     for (unsigned int i = hash_index * MAX_COLLISIONS; i < HASH_LIST_LENGTH; i++) {
-//         if(i >= max_index)
-//             return (unsigned int)-1;
-//         // 强制限制 current_index 的范围
-//         //current_index = i & (HASH_LIST_LENGTH - 1); 
-//         current_index = i;
-
-//         // 检查偏移是否合法，避免越界访问
-//         // unsigned int offset = current_index * sizeof(unsigned int);
-//         // if (offset + sizeof(unsigned int) > sizeof(table->hash_node))
-//         //     return (unsigned int)-1;
-
-//         value = table->hash_node[current_index];
-//         // int ret = bpf_probe_read(&value,sizeof(value),&table->hash_node[current_index]);
-//         // if(ret < 0)
-//         //     return (unsigned int)-1;
-
-//         if (found && value != (unsigned int)-1) {
-//             // 找到下一个有效值，返回
-//             return value;
+// static int perf_update_task_concerd(void){
+//     //struct hash_table *table = bpf_map_lookup_elem(&thread_occupied_map,&zero);
+//     u64 now = bpf_ktime_get_ns();
+//     // if(!table)
+//     //     return -1;
+//     struct task_cpu_usage *task;
+//     u32 flag = 0,index = 0;
+//     //u32 flag = hash_table_foreach(table,0);
+//     //u32 count = 0;
+//     struct data_list *list = bpf_map_lookup_elem(&occupied_list,&zero);
+//     if(!list)
+//         return 0;
+//     for(index = 0;index<50;index++)
+//     {
+//         if(list->list[index] == 0)
+//             continue;
+//         flag = list->list[index];
+//         //bpf_printk("current task is %u",flag);
+//         // if(count > 128*6)
+//         //     return -2;
+//         // count++;
+//         task = bpf_map_lookup_elem(&task_cpu_usage_map,&flag);
+//         if(task != NULL){
+//             if(task->last_run_time == 0)
+//                 continue;
+//             if(task->last_run_time < now - (2*HALF_SECOND))
+//             {
+//                 // 删除过时的元素
+//                 //hash_table_delete(table,flag);
+//                 bpf_map_delete_elem(&thread_occupied_map,&flag);
+//                 list->list[index] = 0;
+//             }
+//             else{
+//                 task->already_backtrace = false;
+//                 task->total_percent = task->total_time_ns * 100/ HALF_SECOND;
+//                 task->kernel_percent = task->kernel_time_ns * 100/task->total_time_ns;
+//                 task->user_percent = task->user_time_ns * 100/task->total_time_ns;
+//                 if(task->total_percent > 5){
+//                     struct task_cpu_usage *buff = bpf_ringbuf_reserve(&task_occupied_buffer,sizeof(struct task_cpu_usage),0);
+//                     if(!buff){
+//                         bpf_printk("task ringbuff reserve failed\n");
+//                     }
+//                     else{
+//                         memset(buff,0,sizeof(struct task_cpu_usage));
+//                         bpf_probe_read_kernel_str(buff->task_info.comm,sizeof(task->task_info.comm),task->task_info.comm);                       
+//                         buff->task_info.pid = task->task_info.pid;
+//                         buff->total_percent = task->total_percent > 100 ? 99:task->total_percent;
+//                         buff->kernel_percent = task->kernel_percent > 100 ? 99:task->kernel_percent;
+//                         buff->user_percent = task->user_percent > 100 ? 99:task->user_percent;
+//                         bpf_ringbuf_submit(buff,0);
+//                     }
+//                 }else{
+//                     // 删除阈值不达标的元素
+//                     //hash_table_delete(table,flag);
+//                     bpf_map_delete_elem(&thread_occupied_map,&flag);
+//                     list->list[index] = 0;
+//                 }
+//                 bpf_map_update_elem(&task_cpu_usage_map,&flag,task,BPF_ANY);
+//             }
 //         }
-
-//         if (value == key) {
-//             // 标记找到 key
-//             found = 1;
-//         }
+//         u32 _flag = flag;
+//         //flag = hash_table_foreach(table,_flag);
 //     }
-
-//     return (unsigned int)-1; // 未找到下一个有效值
+//     //bpf_map_update_elem(&thread_occupied_map,&zero,table,BPF_ANY);
+//     bpf_map_update_elem(&occupied_list,&zero,list,BPF_ANY);
+//     return 0;
 // }
 
-static int perf_update_task_concerd(void){
-    //struct hash_table *table = bpf_map_lookup_elem(&thread_occupied_map,&zero);
-    u64 now = bpf_ktime_get_ns();
-    // if(!table)
-    //     return -1;
-    struct task_cpu_usage *task;
-    u32 flag = 0,index = 0;
-    //u32 flag = hash_table_foreach(table,0);
-    //u32 count = 0;
-    struct data_list *list = bpf_map_lookup_elem(&occupied_list,&zero);
-    if(!list)
-        return 0;
-    for(index = 0;index<50;index++)
-    {
-        if(list->list[index] == 0)
-            continue;
-        flag = list->list[index];
-        //bpf_printk("current task is %u",flag);
-        // if(count > 128*6)
-        //     return -2;
-        // count++;
-        task = bpf_map_lookup_elem(&task_cpu_usage_map,&flag);
-        if(task != NULL){
-            if(task->last_run_time == 0)
-                continue;
-            if(task->last_run_time < now - (2*HALF_SECOND))
-            {
-                // 删除过时的元素
-                //hash_table_delete(table,flag);
-                bpf_map_delete_elem(&thread_occupied_map,&flag);
-                list->list[index] = 0;
-            }
-            else{
-                task->already_backtrace = false;
-                task->total_percent = task->total_time_ns * 100/ HALF_SECOND;
-                task->kernel_percent = task->kernel_time_ns * 100/task->total_time_ns;
-                task->user_percent = task->user_time_ns * 100/task->total_time_ns;
-                if(task->total_percent > 5){
-                    struct task_cpu_usage *buff = bpf_ringbuf_reserve(&task_occupied_buffer,sizeof(struct task_cpu_usage),0);
-                    if(!buff){
-                        bpf_printk("task ringbuff reserve failed\n");
-                    }
-                    else{
-                        memset(buff,0,sizeof(struct task_cpu_usage));
-                        bpf_probe_read_kernel_str(buff->task_info.comm,sizeof(task->task_info.comm),task->task_info.comm);                       
-                        buff->task_info.pid = task->task_info.pid;
-                        buff->total_percent = task->total_percent > 100 ? 99:task->total_percent;
-                        buff->kernel_percent = task->kernel_percent > 100 ? 99:task->kernel_percent;
-                        buff->user_percent = task->user_percent > 100 ? 99:task->user_percent;
-                        bpf_ringbuf_submit(buff,0);
-                    }
-                }else{
-                    // 删除阈值不达标的元素
-                    //hash_table_delete(table,flag);
-                    bpf_map_delete_elem(&thread_occupied_map,&flag);
-                    list->list[index] = 0;
-                }
-                bpf_map_update_elem(&task_cpu_usage_map,&flag,task,BPF_ANY);
-            }
-        }
-        u32 _flag = flag;
-        //flag = hash_table_foreach(table,_flag);
-    }
-    //bpf_map_update_elem(&thread_occupied_map,&zero,table,BPF_ANY);
-    bpf_map_update_elem(&occupied_list,&zero,list,BPF_ANY);
-    return 0;
-}
-
-static int perf_update_process_concerd(void){
-    //struct hash_table *table = bpf_map_lookup_elem(&process_occupied_map,&zero);
-    u64 now = bpf_ktime_get_ns();
-    // if(!table)
-    //     return -1;
-    struct process_struct *ps;
-    u32 flag = 0,index = 0;
-    //u32 flag = hash_table_foreach(table,0);
-    //u32 count = 0;
-    struct data_list *list = bpf_map_lookup_elem(&occupied_list,&one);
-    if(!list)
-        return 0;
-    for(index = 0;index<50;index++)
-    {
-        if(list->list[index] == 0)
-            continue;
-        flag = list->list[index];
-        //bpf_printk("current process is %u",flag);
-        // if(count > 128*6)
-        //     return -2;
-        // count++;
-        ps = bpf_map_lookup_elem(&process_map,&flag);
-        if(ps != NULL){
-            if(ps->total_use_time == 0)
-                continue;
-            if(ps->last_total_clear < now - (2*HALF_SECOND))
-            {
-                // 删除过时的元素
-                //hash_table_delete(&table,flag);
-                bpf_map_delete_elem(&process_occupied_map,&flag);
-                list->list[index] = 0;
-            }
-            else{
-                ps->total_use_percent = ps->total_use_time *100 / HALF_SECOND;
-                if(ps->total_use_percent > 10){
-                    struct process_struct *buff = bpf_ringbuf_reserve(&process_occupied_buffer,sizeof(struct process_struct),0);
-                    if(!buff){
-                        bpf_printk("ps ringbuff reserve failed\n");
-                    }
-                    else{
-                        memset(buff,0,sizeof(struct process_struct));
-                        buff->kids_length = ps->kids_length;
-                        buff->tgid = ps->tgid;
-                        buff->total_use_percent = ps->total_use_percent;
-                        bpf_ringbuf_submit(buff,0);
-                    }
-                }else{
-                    // 删除阈值不达标的元素
-                    //hash_table_delete(&table,flag);
-                    bpf_map_delete_elem(&process_occupied_map,&flag);
-                    list->list[index] = 0;
-                }
-                bpf_map_update_elem(&process_map,&flag,ps,BPF_ANY);
-            }
-        }
-        u32 _flag = flag;
-        //flag = hash_table_foreach(table,_flag);
-    }
-    //bpf_map_update_elem(&process_occupied_map,&zero,table,BPF_ANY);
-    bpf_map_update_elem(&occupied_list,&one,list,BPF_ANY);
-    return 0;
-}
+// static int perf_update_process_concerd(void){
+//     //struct hash_table *table = bpf_map_lookup_elem(&process_occupied_map,&zero);
+//     u64 now = bpf_ktime_get_ns();
+//     // if(!table)
+//     //     return -1;
+//     struct process_struct *ps;
+//     u32 flag = 0,index = 0;
+//     //u32 flag = hash_table_foreach(table,0);
+//     //u32 count = 0;
+//     struct data_list *list = bpf_map_lookup_elem(&occupied_list,&one);
+//     if(!list)
+//         return 0;
+//     for(index = 0;index<50;index++)
+//     {
+//         if(list->list[index] == 0)
+//             continue;
+//         flag = list->list[index];
+//         //bpf_printk("current process is %u",flag);
+//         // if(count > 128*6)
+//         //     return -2;
+//         // count++;
+//         ps = bpf_map_lookup_elem(&process_map,&flag);
+//         if(ps != NULL){
+//             if(ps->total_use_time == 0)
+//                 continue;
+//             if(ps->last_total_clear < now - (2*HALF_SECOND))
+//             {
+//                 // 删除过时的元素
+//                 //hash_table_delete(&table,flag);
+//                 bpf_map_delete_elem(&process_occupied_map,&flag);
+//                 list->list[index] = 0;
+//             }
+//             else{
+//                 ps->total_use_percent = ps->total_use_time *100 / HALF_SECOND;
+//                 if(ps->total_use_percent > 10){
+//                     struct process_struct *buff = bpf_ringbuf_reserve(&process_occupied_buffer,sizeof(struct process_struct),0);
+//                     if(!buff){
+//                         bpf_printk("ps ringbuff reserve failed\n");
+//                     }
+//                     else{
+//                         memset(buff,0,sizeof(struct process_struct));
+//                         buff->kids_length = ps->kids_length;
+//                         buff->tgid = ps->tgid;
+//                         buff->total_use_percent = ps->total_use_percent;
+//                         bpf_ringbuf_submit(buff,0);
+//                     }
+//                 }else{
+//                     // 删除阈值不达标的元素
+//                     //hash_table_delete(&table,flag);
+//                     bpf_map_delete_elem(&process_occupied_map,&flag);
+//                     list->list[index] = 0;
+//                 }
+//                 bpf_map_update_elem(&process_map,&flag,ps,BPF_ANY);
+//             }
+//         }
+//         u32 _flag = flag;
+//         //flag = hash_table_foreach(table,_flag);
+//     }
+//     //bpf_map_update_elem(&process_occupied_map,&zero,table,BPF_ANY);
+//     bpf_map_update_elem(&occupied_list,&one,list,BPF_ANY);
+//     return 0;
+// }
 
 static int perf_runqlat(void){
     struct runqlat_perf_data *buff = bpf_ringbuf_reserve(&runqlat_buffer,sizeof(struct runqlat_perf_data),0);
@@ -1186,47 +1190,6 @@ static int perf_runqlat(void){
     return 0;
 }
 
-static int perf_task_backtrace(void){
-    u64 now = bpf_ktime_get_ns();
-    struct task_trace_event *task;
-    u32 flag = 0,index = 0;
-    struct data_list *list = bpf_map_lookup_elem(&occupied_list,&zero);
-    if(!list)
-        return 0;
-    for(index = 0;index<50;index++)
-    {
-        if(list->list[index] == 0)
-            continue;
-        flag = list->list[index];
-        task = bpf_map_lookup_elem(&task_trace_data_map,&flag);
-        if(task != NULL){
-            struct task_trace_event *buff = bpf_ringbuf_reserve(&task_backtrace_buffer,sizeof(struct task_trace_event),0);
-            if(!buff){
-                bpf_printk("backtrace buff allocate failed\n");
-            }else{
-                //bpf_printk("current pid is %u",flag);
-                memset(buff,0,sizeof(struct task_trace_event));
-                buff->pid = flag;
-                buff->kstack_sz = task->kstack_sz;
-                buff->ustack_sz = task->ustack_sz;
-                bpf_probe_read_kernel_str(buff->comm,sizeof(task->comm),task->comm);
-                for(int j=0;j<MAX_STACK_DEPTH;j++){
-                    if(j > task->kstack_sz)
-                        break;
-                    buff->k_stack[j] = task->k_stack[j];
-                }
-                for(int j=0;j<MAX_STACK_DEPTH;j++){
-                    if(j > task->ustack_sz)
-                        break;
-                    buff->u_stack[j] = task->u_stack[j];
-                }
-                bpf_ringbuf_submit(buff, 0);
-            }
-        }
-    }
-    return 0;
-}
-
 SEC("perf_event")
 int handle_cpu_event(struct bpf_perf_event_data *ctx){
     if(!init_cpus_num){
@@ -1245,27 +1208,27 @@ int handle_cpu_event(struct bpf_perf_event_data *ctx){
     return 0;
 }
 
-SEC("perf_event")
-int handle_task_usage_event(struct bpf_perf_event_data *ctx){
-    int res = perf_update_task_concerd();
-    //bpf_printk("task perf finish");
-    if(res == -1)
-        bpf_printk("the task_occupied_map is not init\n");
-    else if(res == -2)
-        bpf_printk("out of index, there may be exist infinit loop\n");
-    return 0;
-}
+// SEC("perf_event")
+// int handle_task_usage_event(struct bpf_perf_event_data *ctx){
+//     int res = perf_update_task_concerd();
+//     //bpf_printk("task perf finish");
+//     if(res == -1)
+//         bpf_printk("the task_occupied_map is not init\n");
+//     else if(res == -2)
+//         bpf_printk("out of index, there may be exist infinit loop\n");
+//     return 0;
+// }
 
-SEC("perf_event")
-int handle_process_stat_event(struct bpf_perf_event_data *ctx){
-    int res = perf_update_process_concerd();
-    //bpf_printk("task perf finish");
-    if(res == -1)
-        bpf_printk("the process_occupied_map is not init\n");
-    else if(res == -2)
-        bpf_printk("out of index, there may be exist infinit loop\n");
-    return 0;
-}
+// SEC("perf_event")
+// int handle_process_stat_event(struct bpf_perf_event_data *ctx){
+//     int res = perf_update_process_concerd();
+//     //bpf_printk("task perf finish");
+//     if(res == -1)
+//         bpf_printk("the process_occupied_map is not init\n");
+//     else if(res == -2)
+//         bpf_printk("out of index, there may be exist infinit loop\n");
+//     return 0;
+// }
 
 SEC("perf_event")
 int handle_sys_latency_event(struct bpf_perf_event_data *ctx){
@@ -1273,8 +1236,8 @@ int handle_sys_latency_event(struct bpf_perf_event_data *ctx){
     return 0;
 }
 
-SEC("perf_event")
-int handle_task_backtrace_event(struct bpf_perf_event_data *ctx){
-    perf_task_backtrace();
-    return 0;
-}
+// SEC("perf_event")
+// int handle_task_backtrace_event(struct bpf_perf_event_data *ctx){
+//     perf_task_backtrace();
+//     return 0;
+// }
