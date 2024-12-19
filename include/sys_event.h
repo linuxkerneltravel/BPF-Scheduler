@@ -4,10 +4,12 @@
 
 #include <linux/version.h>
 #include <asm/types.h>
+#include <string.h>
 
 
 #define TASK_COMM_LEN 16
-typedef unsigned long long u64;
+//typedef unsigned long long u64;
+typedef uint64_t u64;
 typedef unsigned int u32;
 typedef __u16 u16;
 typedef __u8 u8;

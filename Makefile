@@ -218,12 +218,12 @@ ARCH ?= $(shell uname -m | sed 's/x86_64/x86/' \
 			 | sed 's/loongarch64/loongarch/')
 VMLINUX := ../vmlinux/$(ARCH)/vmlinux.h
 
-INCLUDES := -I$(OUTPUT) -I../../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I$(LIBBLAZESYM_INC) -I./include
+INCLUDES := -I$(OUTPUT) -I../../../libbpf/include/uapi -I$(dir $(VMLINUX)) -I$(LIBBLAZESYM_INC) -I./include -Iinclude/
 CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
-APPS = cpu_stats mm_stats mm_leak io_stats net_stats
-TARGETS = os_spy
+APPS = cpu_stats mm_stats mm_leak io_stats net_stats scx_nest
+TARGETS = scx_spy
 CONTROLLER := cpu_controller
 
 SRC_DIR = ./include

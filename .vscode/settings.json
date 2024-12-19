@@ -101,6 +101,7 @@
     "proc_data.h": "c",
     "btf.h": "c",
     "io_stats.skel.h": "c",
-    "env.h": "c"
+    "env.h": "c",
+    "common.h": "c"
   }
 }

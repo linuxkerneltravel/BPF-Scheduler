@@ -22,7 +22,6 @@
 #include "net_event.h"
 #include "mm_event.h"
 #include "blazesym.h"
-#include "hash_table.h"
 
 #include "cpu_stats.skel.h"
 #include "io_stats.skel.h"
