@@ -1,2 +1,0 @@
-Timestamp,PID,Comm,State,Event_Type,Source_IP,Source_Port,Destination_IP,Destination_Port
-2024-12-16 09:58:36.802235716,280053,xrdp,ESTABLISHED,1,10.193.121.196,63213,118.89.204.198,443

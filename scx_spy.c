@@ -298,6 +298,7 @@ int main(int argc, char **argv){
     // 注册信号处理器，捕获Ctrl-C (SIGINT)
     signal(SIGINT, handle_sigint);
     signal(SIGTERM, handle_sigint);
+
     if(env_data.sched_ext){
         libbpf_set_print(scx_libbpf_print_fn);
     }
@@ -602,8 +603,16 @@ static int attach_scx_skel()
         return -1;
     }
 
+    int cores = 0;
+    FILE *fp = popen("grep -c '^processor' /proc/cpuinfo", "r");
+    if (fp) {
+        fscanf(fp, "%d", &cores);
+        pclose(fp);
+    }
+
     // 初始化只读数据
-    scx_skel->rodata->nr_cpus = libbpf_num_possible_cpus();
+    //scx_skel->rodata->nr_cpus = libbpf_num_possible_cpus();
+    scx_skel->rodata->nr_cpus = cores;
     scx_skel->rodata->sampling_cadence_ns = SAMPLING_CADENCE_S * 1000 * 1000 * 1000;
     scx_skel->rodata->p_remove_ns = sched_env.p_remove_ns;
     scx_skel->rodata->r_max = sched_env.r_max;
@@ -667,8 +676,8 @@ static void scx_read_stats(struct scx_nest_bpf *skel, u64 *stats)
 	for (idx = 0; idx < NEST_STAT(NR); idx++) {
 		int ret, cpu;
 
-        printf("skel=%p\n", skel);
-        printf("skel->maps.stats=%p\n", &skel->maps.stats);
+        // printf("skel=%p\n", skel);
+        // printf("skel->maps.stats=%p\n", &skel->maps.stats);
 
 		ret = bpf_map_lookup_elem(bpf_map__fd(skel->maps.stats),
 					  &idx, cnts[idx]);
