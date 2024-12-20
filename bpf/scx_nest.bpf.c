@@ -29,7 +29,7 @@
 
 #define TASK_DEAD                       0x00000080
 
-char _license[] SEC("license") = "GPL";
+char _license[] SEC("license") = "Dual BSD/GPL";
 
 enum {
 	FALLBACK_DSQ_ID		= 0,// 默认调度队列的标识符。
@@ -101,6 +101,37 @@ struct task_ctx {
 	s32 prev_cpu;
 };
 
+// 任务的 CPU 使用情况,和cpu_event那边一样,这边引入是方便动态调节时间片
+struct task_info_simple{
+    u32 pid;                
+    u32 tgid;               
+    u32 cpu_id; 
+    char comm[TASK_COMM_LEN];
+};
+
+struct task_cpu_usage {
+    struct  task_info_simple task_info;
+
+    //bool already_backtrace;
+    bool in_kernel;
+    bool in_process;
+    bool already_output;
+
+    u64 user_time_ns;       
+    u64 kernel_time_ns;     
+    u64 total_time_ns;     
+    u64 last_run_time; 
+    u64 last_enqeue_time;
+
+    u64 wait_time;
+    u64 last_clear_time;
+    u64 last_trace_time;
+
+    u32 user_percent;       
+    u32 kernel_percent;     
+    u32 total_percent;     
+};
+
 // 任务的调度上下文 (task_ctx)
 struct {
 	__uint(type, BPF_MAP_TYPE_TASK_STORAGE);
@@ -140,6 +171,66 @@ struct {
 	__type(key, u32);
 	__type(value, struct stats_timer);
 } stats_timer SEC(".maps");
+
+/*-----------------和cpu_stats交互来抑制异常task-----------------------*/
+struct cpu_bad_guys {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 512);
+	__type(key, u32);
+	__type(value, u32);
+} cpu_bad_guys_map SEC(".maps");
+
+// struct{
+// 	__uint(type, BPF_MAP_TYPE_ARRAY_OF_MAPS);
+// 	__uint(max_entries, 1);
+// 	__type(key, u32);
+// 	__type(value, int); // 子 Map 的文件描述符
+// } cpu_filter_ids SEC(".maps");
+
+struct{
+	__uint(type, BPF_MAP_TYPE_ARRAY_OF_MAPS);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__array(values,struct cpu_bad_guys);
+} cpu_filter_ids SEC(".maps");
+
+
+struct task_cpu_usage_map {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 102400);
+	__type(key, u32);
+	__type(value, struct task_cpu_usage);
+} task_usage_map SEC(".maps");
+
+
+struct{
+	__uint(type, BPF_MAP_TYPE_ARRAY_OF_MAPS);
+	__uint(max_entries, 1);
+	__type(key, u32);
+	__array(values,struct task_cpu_usage_map);
+} cpu_task_usage_map SEC(".maps");
+
+
+// 处理用户态传的可能被误伤的任务名
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, struct comm_info);
+	__type(value, u32);
+} comm_ignore_map SEC(".maps");
+
+// 处理用户态传的要去特别注意的任务
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, struct comm_info);
+	__type(value, u32);
+} comm_attention_map SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 512 * 1024);  
+} cpu_mask_buffer SEC(".maps");
 
 const volatile u32 nr_cpus = 1; /* !0 for veristat, set during init. */
 
@@ -249,6 +340,46 @@ static int compact_primary_core(void *map, int *key, struct bpf_timer *timer)
 	// 更新核心上下文的压缩状态
 	pcpu_ctx->scheduled_compaction = false;
 	return 0;
+}
+
+// 对于处理过了，相当于dispatch了，就return 0，否则return 1交给正常调度
+static int operate_bad_guys(struct task_struct *p,u64 enq_flags){
+	// 对于内核任务直接跳了，怕影响出问题
+	if(p->flags & PF_KTHREAD)
+		return 1;
+	struct comm_info name;
+	bpf_probe_read_kernel_str(name.comm,sizeof(p->comm),p->comm);
+	// 跳过误伤名单的
+	u32 *ident = bpf_map_lookup_elem(&comm_ignore_map,&name);
+	if(ident){
+		return 1;
+	}
+	// 对特别关注的问题任务控制调度
+	ident = bpf_map_lookup_elem(&comm_attention_map,&name);
+	if(ident){
+		u64 vtime = p->scx.dsq_vtime;// 获取任务的虚拟时间
+		if (vtime_before(vtime, vtime_now - slice_ns))
+			vtime = vtime_now - slice_ns;
+		scx_bpf_dispatch_vtime(p, FALLBACK_DSQ_ID, slice_ns/2, vtime,
+			       enq_flags);
+		return 0;
+	}
+	u32 zero = 0;
+	struct cpu_bad_guys *bad_guy = bpf_map_lookup_elem(&cpu_filter_ids,&zero);
+	u32 pid = p->pid;
+	if(bad_guy){
+		ident = bpf_map_lookup_elem(bad_guy,&pid);
+		if(ident){
+			u64 vtime = p->scx.dsq_vtime;// 获取任务的虚拟时间
+			if (vtime_before(vtime, vtime_now - slice_ns))
+				vtime = vtime_now - slice_ns;
+			scx_bpf_dispatch_vtime(p, FALLBACK_DSQ_ID, slice_ns/2, vtime,
+			       enq_flags);
+			return 0;
+		}
+	}
+
+	return 1;
 }
 
 s32 BPF_STRUCT_OPS(nest_select_cpu, struct task_struct *p, s32 prev_cpu,
@@ -445,20 +576,13 @@ migrate_primary:// 直接迁移到 Primary
 	bpf_rcu_read_unlock();
 	// 调用 update_attached 更新任务的附加核心（attached_core）和前一次运行核心（prev_cpu），为下一次调度做准备
 	update_attached(tctx, prev_cpu, cpu);
-	scx_bpf_dispatch(p, SCX_DSQ_LOCAL, slice_ns, 0);
+	//scx_bpf_dispatch(p, SCX_DSQ_LOCAL, slice_ns, 0);
 
-	开始过滤特殊任务
-	bool is_bad = bpf_strncmp(p->comm, COMPARE_COMM_LEN, bad_guy) == 0;
-	if(is_bad){
-		u64 vtime = p->scx.dsq_vtime;// 获取任务的虚拟时间
-		if (vtime_before(vtime, vtime_now - slice_ns))
-			vtime = vtime_now - slice_ns;
-		scx_bpf_dispatch_vtime(p, FALLBACK_DSQ_ID, slice_ns/2, vtime,
-			       0);
-		return cpu;
-	}
-
-	scx_bpf_dispatch(p, SCX_DSQ_LOCAL_ON | cpu , slice_ns, 0);
+	// 开始过滤特殊任务
+	int ret = operate_bad_guys(p,0);
+	if(ret == 1)
+		scx_bpf_dispatch(p, SCX_DSQ_LOCAL_ON | cpu  , slice_ns, 0);
+	//scx_bpf_dispatch(p, SCX_DSQ_LOCAL_ON | cpu , slice_ns, 0);
 	return cpu;
 }
 
@@ -481,14 +605,10 @@ void BPF_STRUCT_OPS(nest_enqueue, struct task_struct *p, u64 enq_flags)
 	if (vtime_before(vtime, vtime_now - slice_ns))
 		vtime = vtime_now - slice_ns;
 
-	开始过滤特殊任务
-	bool is_bad = bpf_strncmp(p->comm, COMPARE_COMM_LEN, bad_guy) == 0;
-	if(is_bad){
-		scx_bpf_dispatch_vtime(p, FALLBACK_DSQ_ID, slice_ns/2, vtime,
-			       enq_flags);
-	}
-
-	scx_bpf_dispatch_vtime(p, FALLBACK_DSQ_ID, slice_ns, vtime,
+	// 开始过滤特殊任务
+	int ret = operate_bad_guys(p,enq_flags);
+	if(ret == 1)
+		scx_bpf_dispatch_vtime(p, FALLBACK_DSQ_ID, slice_ns, vtime,
 			       enq_flags);
 }
 
@@ -738,6 +858,21 @@ s32 BPF_STRUCT_OPS_SLEEPABLE(nest_init)
 void BPF_STRUCT_OPS(nest_exit, struct scx_exit_info *ei)
 {
 	UEI_RECORD(uei, ei);
+}
+
+SEC("perf_event")
+int handle_cpu_mask_event(struct bpf_perf_event_data *ctx){
+	struct cpu_mask_data *buff = bpf_ringbuf_reserve(&cpu_mask_buffer,sizeof(struct cpu_mask_data),0);
+	if(!buff){
+		bpf_printk("cpu mask ringbuf reserve failed\n");
+		return 0;
+	}
+	buff->stats_primary_mask = stats_primary_mask;
+	buff->stats_reserved_mask = stats_reserved_mask;
+	buff->stats_other_mask = stats_other_mask;
+	buff->stats_idle_mask = stats_idle_mask;
+	bpf_ringbuf_submit(buff,0);
+	return 0;
 }
 
 SCX_OPS_DEFINE(nest_ops,

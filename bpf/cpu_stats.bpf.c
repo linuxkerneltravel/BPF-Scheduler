@@ -71,7 +71,7 @@ DEFINE_BPF_MAP(process_map,BPF_MAP_TYPE_HASH,MAX_PROCESS_ENTRIES,u32,struct proc
 //DEFINE_BPF_MAP(process_kids_map,BPF_MAP_TYPE_HASH,MAX_PROCESS_ENTRIES,u32,struct hash_table);
 
 DEFINE_BPF_MAP(thread_occupied_map,BPF_MAP_TYPE_HASH,512,u32,u32);
-DEFINE_BPF_MAP(process_occupied_map,BPF_MAP_TYPE_HASH,256,u32,u32);
+DEFINE_BPF_MAP(process_occupied_map,BPF_MAP_TYPE_HASH,512,u32,u32);
 //DEFINE_BPF_MAP(occupied_list,BPF_MAP_TYPE_ARRAY,2,u32,struct data_list);
 
 // 任务延迟计数统计
@@ -242,25 +242,6 @@ static int perf_task_backtrace(u32 pid){
 
 static int init_process(u32 tgid,u32 pid) {
     struct process_struct ps;
-    //hash_table_init(&ps.kids); 
-    // struct hash_table *table = bpf_map_lookup_elem(&hash_table_model_map,&zero);
-    // if(!table)
-    //     return -1;
-    
-    //bpf_probe_read_kernel(&template_table,sizeof(template_table),table);
-
-    //int res = bpf_map_update_elem(&process_kids_map,&tgid,table,BPF_ANY);
-    //int res = bpf_map_update_elem(&process_kids_map,&tgid,&template_table,BPF_ANY);
-    // if(res < 0){
-    //     bpf_printk("process %u kids map init failed,error code is %i",tgid,res);
-    // }
-
-    // table = bpf_map_lookup_elem(&process_kids_map,&tgid);
-    // if(!table)
-    // {
-    //     bpf_printk("process %u kids map init failed",tgid);
-    //     return -1;
-    // }
     
     ps.tgid = tgid;
     ps.kids_length = 1;
@@ -531,7 +512,7 @@ static int process_update_runtime(u32 tgid,u64 delta,bool reset, u64 last_cpu_cl
     ps->total_use_time += delta;
     //bpf_printk("process %u total use time is %lu \n",tgid,ps->total_use_time);
     bpf_map_update_elem(&process_map,&tgid,ps,BPF_ANY);
-    process_concerned_update(ps,10);
+    process_concerned_update(ps,80);
 
     return 0;
 }
@@ -591,7 +572,7 @@ int record_task_switch(struct trace_event_raw_sched_switch *ctx)
                     cpu_usage->usr_times += delta;
                 }
                 pre_usage->total_time_ns += delta;
-                task_concerned_update(pre_usage,5);
+                task_concerned_update(pre_usage,60);
 
                 if(pre_usage->task_info.tgid != 0){
                     u32 tgid = pre_usage->task_info.tgid;

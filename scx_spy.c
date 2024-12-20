@@ -82,18 +82,36 @@ void handle_sigint(int sig) {
 }
 
 /*-----------------------------------sched_ext部分--------------------------------*/
+// 
+
 #define SAMPLING_CADENCE_S 2
 
 struct scx_nest_bpf *scx_skel = NULL;
 struct bpf_link *scx_link = NULL;
+struct bpf_link *link_to_cpu_mask = NULL;
+struct ring_buffer *rb_cpu_mask = NULL;
 u64 ecode;
 
+int cores = 0;// 核心数
+
+const char ignore_file[] = "./ignore.txt"; // 小心scx_nest误伤的任务
+const char attention_file[] = "./attention.txt";// 要去特别注意的任务
+
+const char *sched_txt_names[] = {
+        "active_nests",
+        "nest_stats",
+    };
+
+FILE *sched_txt_files[MAX_CSV_FILES];
+
 static bool verbose;
+static u32 slow_weight = 3;
+static u32 slow_count = 0;
 
 static struct scx_env sched_env = {
-    .p_remove_ns = 2000 * 1000,  // 默认 2000us 转换为纳秒
-    .r_max = 5,                  // 默认最大备用核心数
-    .r_impatient = 2,            // 默认失败次数
+    .p_remove_ns = 2000 * 1000,  // 默认 2000us 转换为纳秒  3000(当前最佳)
+    .r_max = 5,                  // 默认最大备用核心数  8(当前最佳)
+    .r_impatient = 2,            // 默认失败次数     4(当前最佳)
     .slice_ns = 20000 * 1000,    // 默认时间片 20000us 转换为纳秒
     .find_fully_idle = false,    // 默认不查找完全空闲核心
     .verbose = false,            // 默认关闭调试信息
@@ -126,6 +144,9 @@ static int attach_scx_skel(struct scx_nest_bpf *skel);
 static int scx_operation();
 static void scx_resource_clean();
 
+static int handle_usr_cpu_mask_event(void *ctx, void *data, size_t data_sz);
+
+static int sched_create_txt();
 
 /*----------------------网络部分----------------------------------*/
 // 和可视化有关的
@@ -284,7 +305,7 @@ static int handle_usr_task_usage_event(void *ctx,void *data, size_t data_sz);
 static int handle_use_process_stat_event(void *ctx,void *data, size_t data_sz);
 static int handle_usr_runqlat_event(void *ctx,void *data, size_t data_sz);
 
-static int attach_cpu_skel(struct cpu_stats_bpf *skel);
+static int attach_cpu_skel();
 static int cpu_ring_buffer_poll();
 static void cpu_resource_clean();
 
@@ -299,10 +320,6 @@ int main(int argc, char **argv){
     signal(SIGINT, handle_sigint);
     signal(SIGTERM, handle_sigint);
 
-    if(env_data.sched_ext){
-        libbpf_set_print(scx_libbpf_print_fn);
-    }
-
 restart:
     //printf("----------------------------------------\n");
     ret = init_time();
@@ -313,16 +330,6 @@ restart:
     if(ret != 0)
         goto cleanup;
 
-    if(env_data.sched_ext){
-        ret = attach_scx_skel(scx_skel);
-        if(!scx_skel)
-        {
-            printf("failed to open scx_skel\n");
-            goto cleanup;
-        }
-        if(ret != 0)
-            goto cleanup;
-    }
 
     if(env_data.cpu_data){
         if(env_data.visualize){
@@ -333,7 +340,7 @@ restart:
             if(ret != 0)
                 goto cleanup;
         }
-        ret = attach_cpu_skel(cpu_skel);
+        ret = attach_cpu_skel();
         if(ret != 0)
             goto cleanup;
     }
@@ -415,6 +422,22 @@ restart:
 	    ret = attach_mm_stats_skel(mm_skel);
 	    if(ret != 0)
 		    goto cleanup;
+    }
+
+    if(env_data.sched_ext){
+        if(env_data.visualize){
+            ret = sched_create_txt();
+            if(ret != 0)
+                goto cleanup;
+        }
+        ret = attach_scx_skel(scx_skel);
+        if(ret != 0)
+            goto cleanup;
+        // if(env_data.visualize){
+        //     ret = sched_create_txt();
+        //     if(ret != 0)
+        //         goto cleanup;
+        // }
     }
 
     while(stop == 0){
@@ -595,15 +618,129 @@ static int init_time(){
 }
 
 /*-----------------------------------------sched_ext部分------------------------------*/
+// 函数：将任务名加载到 eBPF Map 中
+int load_tasks_name_to_map(const char *filename, int map_fd) {
+    // int map_fd = bpf_map__fd(scx_skel->maps.comm_ignore_map);
+    // if(map_fd < 0){
+    //     fprintf(stderr, "Failed to get comm_ignore_map map fd\n");
+    //     return -1;
+    // }
+    FILE *file = fopen(filename, "r");
+    if (!file) {
+        perror("Failed to open ignore.txt");
+        return -1;
+    }
+
+    char line[256]; // 用于存储每行数据
+    struct comm_info task_key;
+    u32 value = 0; // 值，用于标志该任务需要被忽略
+    int line_count = 0;
+
+    while (fgets(line, sizeof(line), file)) {
+        // 移除行末的换行符
+        line[strcspn(line, "\n")] = '\0';
+
+        // 初始化任务名结构体
+        memset(&task_key, 0, sizeof(task_key));
+
+        // 如果任务名超出 16 字节，则截断
+        if (strlen(line) >= sizeof(task_key.comm)) {
+            fprintf(stderr, "Task name '%s' exceeds 16 characters, truncating.\n", line);
+            strncpy(task_key.comm, line, sizeof(task_key.comm) - 1);
+        } else {
+            strncpy(task_key.comm, line, sizeof(task_key.comm) - 1);
+        }
+
+        // 将任务名存入 eBPF Map
+        if (bpf_map_update_elem(map_fd, &task_key, &value, BPF_ANY) < 0) {
+            perror("Failed to update comm_ignore_map");
+            fclose(file);
+            return -1;
+        }
+
+        line_count++;
+    }
+
+    fclose(file);
+    printf("Successfully loaded %d tasks into comm_ignore_map.\n", line_count);
+    return 0;
+}
+
+static int sched_create_txt() {
+    int ret;
+    int num_txt_names = sizeof(sched_txt_names) / sizeof(sched_txt_names[0]);
+    
+    for(int i=0;i<MAX_CSV_FILES;i++)
+        sched_txt_files[i] = NULL;
+
+    for(int i=0;i<num_txt_names;i++){
+        if(lookup_txt_file(visualize_proc_path,sched_txt_names[i],&sched_txt_files[i]) != 0){
+            fprintf(stderr, "Failed to create %s\n", sched_txt_names[i]);
+            return -1;
+        }
+    }
+    
+    return 0;
+}
+
+static int handle_usr_cpu_mask_event(void *ctx, void *data, size_t data_sz){
+    struct cpu_mask_data *mask_data = data;
+    bool visual = env_data.visualize && sched_txt_files[0];
+    int idx, cpu;
+    char cpus[cores + 1];
+
+    if(visual){
+        fprintf(sched_txt_files[0], "Masks\n");
+        fprintf(sched_txt_files[0], "----------------------------------------\n");
+    }
+
+	print_underline("Masks");
+	for (idx = 0; idx < 4; idx++) {
+		const char *mask_str;
+		u64 mask, total = 0;
+
+		memset(cpus, '-', cores);
+		if (idx == 0) {
+			mask_str = "PRIMARY";
+			mask = mask_data->stats_primary_mask;
+		} else if (idx == 1) {
+			mask_str = "RESERVED";
+			mask = mask_data->stats_reserved_mask;
+		} else if (idx == 2) {
+			mask_str = "OTHER";
+			mask = mask_data->stats_other_mask;
+		} else {
+			mask_str = "IDLE";
+			mask = mask_data->stats_idle_mask;
+		}
+		for (cpu = 0; cpu < cores; cpu++) {
+			if (mask & (1ULL << cpu)) {
+				cpus[cpu] = '*';
+				total++;
+			}
+		}
+		printf("%-9s(%2" PRIu64 "): | %s |\n", mask_str, total, cpus);
+
+        if(visual){
+            fprintf(sched_txt_files[0], "%-9s(%2" PRIu64 "): | %s |\n", mask_str, total, cpus);
+        }
+	}
+
+    if(visual){
+        fflush(sched_txt_files[0]);
+    }
+}
+
 static int attach_scx_skel()
 {
+    libbpf_set_print(scx_libbpf_print_fn);
     scx_skel = SCX_OPS_OPEN(nest_ops, scx_nest_bpf);
     if (!scx_skel) {
         fprintf(stderr, "Failed to open SCX skeleton.\n");
         return -1;
     }
 
-    int cores = 0;
+    //int cores = 0;
     FILE *fp = popen("grep -c '^processor' /proc/cpuinfo", "r");
     if (fp) {
         fscanf(fp, "%d", &cores);
@@ -621,6 +758,77 @@ static int attach_scx_skel()
     scx_skel->rodata->find_fully_idle = sched_env.find_fully_idle;
 
     SCX_OPS_LOAD(scx_skel, nest_ops, scx_nest_bpf, uei);
+
+    if(cpu_skel != NULL){
+        int cpu_fd = bpf_map__fd(cpu_skel->maps.thread_occupied_map);
+        if(cpu_fd < 0){
+            fprintf(stderr, "Failed to get thread_occupied_map map fd\n");
+            return -1;
+        }
+        int scx_fd;
+        struct bpf_map *map = bpf_object__find_map_by_name(scx_skel->obj, "cpu_filter_ids");
+        if (!map) {
+            fprintf(stderr, "Failed to find cpu_filter_ids map\n");
+            return -1;
+        }
+        scx_fd = bpf_map__fd(map);
+        if(scx_fd < 0){
+            fprintf(stderr, "Failed to get cpu_filter_ids map fd\n");
+            return -1;
+        }
+
+        int ret = bpf_map_update_elem(scx_fd, &zero, &cpu_fd, BPF_ANY);
+        if(ret < 0){
+            fprintf(stderr, "Failed to update cpu_filter_ids map\n");
+            return -1;
+        }
+
+        scx_fd = bpf_map__fd(scx_skel->maps.cpu_task_usage_map);
+        if(scx_fd < 0){
+            fprintf(stderr, "Failed to get cpu_task_usage_map map fd\n");
+            return -1;
+        }
+        cpu_fd = bpf_map__fd(cpu_skel->maps.task_cpu_usage_map);
+        if(cpu_fd < 0){
+            fprintf(stderr, "Failed to get task_cpu_usage_map map fd\n");
+            return -1;
+        }
+        ret = bpf_map_update_elem(scx_fd, &zero, &cpu_fd, BPF_ANY);
+        if(ret < 0){
+            fprintf(stderr, "Failed to update cpu_task_usage_map map\n");
+            return -1;
+        }
+    }
+    
+    int map_fd = bpf_map__fd(scx_skel->maps.comm_ignore_map);
+    if(map_fd < 0){
+        fprintf(stderr, "Failed to get comm_ignore_map map fd\n");
+        return -1;
+    }
+    int ret = load_tasks_name_to_map(ignore_file, map_fd);
+    if(ret < 0){
+        fprintf(stderr, "Failed to load tasks name to comm_ignore_map\n");
+        return -1;
+    }
+    map_fd = bpf_map__fd(scx_skel->maps.comm_attention_map);
+    if(map_fd < 0){
+        fprintf(stderr, "Failed to get comm_attention_map map fd\n");
+        return -1;
+    }
+    ret = load_tasks_name_to_map(attention_file, map_fd);
+    if(ret < 0){
+        fprintf(stderr, "Failed to load tasks name to comm_attention_map\n");
+        return -1;
+    }
+
+    link_to_cpu_mask = attach_perf_event_to_program(scx_skel->progs.handle_cpu_mask_event,1000);
+    if(!link_to_cpu_mask){
+        return -1;
+    }
+    scx_skel->links.handle_cpu_mask_event = link_to_cpu_mask;
+
+    rb_cpu_mask = ring_buffer__new(bpf_map__fd(scx_skel->maps.cpu_mask_buffer),handle_usr_cpu_mask_event,NULL,NULL);
+
     scx_link = SCX_OPS_ATTACH(scx_skel, nest_ops, scx_nest_bpf);
 
     return 0;
@@ -635,6 +843,14 @@ static void scx_resource_clean()
         ecode = UEI_REPORT(scx_skel, uei);
         scx_nest_bpf__destroy(scx_skel);
     }
+    if(rb_cpu_mask)
+        ring_buffer__free(rb_cpu_mask);
+    for(int i=0;i<MAX_CSV_FILES;i++){
+        if(sched_txt_files[i])
+            fclose(sched_txt_files[i]);
+        else   
+            break;
+    }
 }
 
 static int scx_operation()
@@ -643,18 +859,41 @@ static int scx_operation()
     enum nest_stat_idx i;
     enum nest_stat_group last_grp = -1;
 
-    scx_read_stats(scx_skel, stats);
-    for (i = 0; i < NEST_STAT(NR); i++) {
-        struct nest_stat *nest_stat = &nest_stats[i];
-        if (nest_stat->group != last_grp) {
-            scx_print_stat_grp(nest_stat->group);
-            last_grp = nest_stat->group;
-        }
-        printf("%s=%" PRIu64 "\n", nest_stat->label, stats[nest_stat->idx]);
+    if(slow_count < slow_weight){
+        slow_count++;
     }
+    else{
+        bool visual = env_data.visualize && sched_txt_files[1];
+        if(visual)
+            fprintf(sched_txt_files[1], "----------------------------------------");
+
+        scx_read_stats(scx_skel, stats);
+        for (i = 0; i < NEST_STAT(NR); i++) {
+            struct nest_stat *nest_stat = &nest_stats[i];
+            if (nest_stat->group != last_grp) {
+                scx_print_stat_grp(nest_stat->group);
+                last_grp = nest_stat->group;
+            }
+            printf("%s=%" PRIu64 "\n", nest_stat->label, stats[nest_stat->idx]);
+            if(visual)
+                fprintf(sched_txt_files[1], "%s=%" PRIu64 "\n", nest_stat->label, stats[nest_stat->idx]);
+
+        }
+        printf("\n");
+        if(visual)
+        {
+            fprintf(sched_txt_files[1], "\n");
+            fflush(sched_txt_files[1]);
+        }
+        slow_count = 0;
+    }
+
+    // print_active_nests(scx_skel);
+    int ret = ring_buffer__poll(rb_cpu_mask, 100);
+    if(ret < 0)
+        return -1;
+
     printf("\n");
-    print_active_nests(scx_skel);
-    printf("\n\n\n");
     fflush(stdout);
 }
 
@@ -675,9 +914,6 @@ static void scx_read_stats(struct scx_nest_bpf *skel, u64 *stats)
 
 	for (idx = 0; idx < NEST_STAT(NR); idx++) {
 		int ret, cpu;
-
-        // printf("skel=%p\n", skel);
-        // printf("skel->maps.stats=%p\n", &skel->maps.stats);
 
 		ret = bpf_map_lookup_elem(bpf_map__fd(skel->maps.stats),
 					  &idx, cnts[idx]);
@@ -732,6 +968,15 @@ static void print_active_nests(const struct scx_nest_bpf *skel)
 	char cpus[nr_cpus + 1];
 
 	memset(cpus, 0, nr_cpus + 1);
+
+    bool visual = env_data.visualize && sched_txt_files[0];
+    // bool visual = false;
+
+    if(visual){
+        fprintf(sched_txt_files[0], "Masks\n");
+        fprintf(sched_txt_files[0], "----------------------------------------\n");
+    }
+
 	print_underline("Masks");
 	for (idx = 0; idx < 4; idx++) {
 		const char *mask_str;
@@ -758,7 +1003,15 @@ static void print_active_nests(const struct scx_nest_bpf *skel)
 			}
 		}
 		printf("%-9s(%2" PRIu64 "): | %s |\n", mask_str, total, cpus);
+
+        if(visual){
+            fprintf(sched_txt_files[0], "%-9s(%2" PRIu64 "): | %s |\n", mask_str, total, cpus);
+        }
 	}
+
+    if(visual){
+        fflush(sched_txt_files[0]);
+    }
 }
 
 
@@ -2789,14 +3042,14 @@ static int handle_usr_runqlat_event(void *ctx,void *data, size_t data_sz){
     return 0;
 }
 
-static int attach_cpu_skel(struct cpu_stats_bpf *skel){
+static int attach_cpu_skel(){
     int err;
 
     if(init_cpu_symbolizer()!=0)
         return -1;
 
-    skel = cpu_stats_bpf__open_and_load();
-    if (!skel) {
+    cpu_skel = cpu_stats_bpf__open_and_load();
+    if (!cpu_skel) {
         fprintf(stderr, "Failed to open and load BPF program\n");
         return 1;
     }
@@ -2807,10 +3060,10 @@ static int attach_cpu_skel(struct cpu_stats_bpf *skel){
         fprintf(stderr,"libbpf: get cpu nums failed \n");
     }
 
-    int map_fd = bpf_map__fd(skel->maps.cpu_usr_map);
+    int map_fd = bpf_map__fd(cpu_skel->maps.cpu_usr_map);
     if(bpf_map_update_elem(map_fd,&zero,&nr_cpu,BPF_ANY) != 0){
         perror("Failed to update nr_cpu_map");
-        cpu_stats_bpf__destroy(skel);
+        cpu_stats_bpf__destroy(cpu_skel);
         return 1;
     }
 
@@ -2831,17 +3084,17 @@ static int attach_cpu_skel(struct cpu_stats_bpf *skel){
     //     return 1;
     // }
 
-    err = cpu_stats_bpf__attach(skel);
+    err = cpu_stats_bpf__attach(cpu_skel);
     if (err) {
         fprintf(stderr, "Failed to attach BPF program: %d\n", err);
         return err;
     }
 
-    struct bpf_link *link_cpu = attach_perf_event_to_program(skel->progs.handle_cpu_event, 500);  // 500 毫秒
+    struct bpf_link *link_cpu = attach_perf_event_to_program(cpu_skel->progs.handle_cpu_event, 500);  // 500 毫秒
     if (!link_cpu) {
         return err;
     }
-    skel->links.handle_cpu_event = link_cpu;
+    cpu_skel->links.handle_cpu_event = link_cpu;
 
     // struct bpf_link *link_task = attach_perf_event_to_program(skel->progs.handle_task_usage_event, 500);  // 500 毫秒
     // if (!link_task) {
@@ -2855,42 +3108,42 @@ static int attach_cpu_skel(struct cpu_stats_bpf *skel){
     // }
     // skel->links.handle_process_stat_event = link_process;
 
-    struct bpf_link *link_runqlat = attach_perf_event_to_program(skel->progs.handle_sys_latency_event,500);
+    struct bpf_link *link_runqlat = attach_perf_event_to_program(cpu_skel->progs.handle_sys_latency_event,500);
     if(!link_runqlat){
         return err;
     }
-    skel->links.handle_sys_latency_event = link_runqlat;
+    cpu_skel->links.handle_sys_latency_event = link_runqlat;
 
     // struct bpf_link *link_backtrace = attach_perf_event_to_program(skel->progs.handle_task_backtrace_event,500);
     // if(!link_backtrace){
     //     return err;
     // }
 
-    rb_cpu = ring_buffer__new(bpf_map__fd(skel->maps.cpu_usage_buffer), handle_cpu_usage_event, NULL, NULL);
+    rb_cpu = ring_buffer__new(bpf_map__fd(cpu_skel->maps.cpu_usage_buffer), handle_cpu_usage_event, NULL, NULL);
     if (!rb_cpu) {
         fprintf(stderr, "Failed to create ring buffer\n");
         return err;
     }
 
-    rb_task = ring_buffer__new(bpf_map__fd(skel->maps.task_occupied_buffer), handle_usr_task_usage_event, NULL, NULL);
+    rb_task = ring_buffer__new(bpf_map__fd(cpu_skel->maps.task_occupied_buffer), handle_usr_task_usage_event, NULL, NULL);
     if (!rb_task) {
         fprintf(stderr, "Failed to create ring buffer for task usage\n");
         return err;
     }
 
-    rb_process = ring_buffer__new(bpf_map__fd(skel->maps.process_occupied_buffer), handle_use_process_stat_event, NULL, NULL);
+    rb_process = ring_buffer__new(bpf_map__fd(cpu_skel->maps.process_occupied_buffer), handle_use_process_stat_event, NULL, NULL);
     if(!rb_process){
         fprintf(stderr, "Failed to create ring buffer for process stat\n");
         return err;
     }
 
-    rb_runqlat = ring_buffer__new(bpf_map__fd(skel->maps.runqlat_buffer), handle_usr_runqlat_event, NULL, NULL);
+    rb_runqlat = ring_buffer__new(bpf_map__fd(cpu_skel->maps.runqlat_buffer), handle_usr_runqlat_event, NULL, NULL);
     if(!rb_runqlat){
         fprintf(stderr, "Failed to create ring buffer for runqlat\n");
         return err;
     }
 
-    rb_backtrace = ring_buffer__new(bpf_map__fd(skel->maps.task_backtrace_buffer), handle_usr_task_cpu_backtrace_event, NULL, NULL);
+    rb_backtrace = ring_buffer__new(bpf_map__fd(cpu_skel->maps.task_backtrace_buffer), handle_usr_task_cpu_backtrace_event, NULL, NULL);
     if(!rb_backtrace){
         fprintf(stderr, "Failed to create ring buffer for cpu task backtrace\n");
         return err;
