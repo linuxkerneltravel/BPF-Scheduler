@@ -139,7 +139,7 @@ SUCCESS_MESSAGE:
 	@echo "\033[38;2;128;255;0m/ /___/ /  / /_/ / /__/ / / / / /__     / /  / / /_/ / /_/ / /_/ / \033[0m"
 	@echo "\033[38;2;0;255;0m\____/_/   \__, /\___/_/ /_/_/\___/____/_/  /_/\__, /\__, /\____/ \033[0m"
 	@echo "\033[38;2;0;255;128m          /____/                 /_____/      /____//____/      \033[0m"
-	@echo "\033[38;2;0;255;255mSuccessful to compile cpu_watcher tools:                      \033[0m"
+	@echo "\033[38;2;0;255;255mSuccessful to compile os_spy tools:                           \033[0m"
 	@echo "\033[38;2;0;255;255mPlease start your use ~                                      \033[0m"
 
 # delete failed targets
