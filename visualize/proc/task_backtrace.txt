@@ -1,25 +1,42 @@
 The stack size is invalid
 Kernel:
+Userspace:
+The stack size is invalid
+Kernel:
+Userspace:
+The stack size is invalid
+Kernel:
+Userspace:
+The stack size is invalid
+Kernel:
+Userspace:
+The stack size is invalid
+Kernel:
+Userspace:
+The stack size is invalid
+Kernel:
 0000000300000160: nft_pcpu_tun_ctx @ 0x38208+0x2fffc7f58
-6572747300009fee: nft_pcpu_tun_ctx @ 0x38208+0x65727472fffd1de6
-000000676e2d7373: nft_pcpu_tun_ctx @ 0x38208+0x676e29f16b
+7064727800012845: nft_pcpu_tun_ctx @ 0x38208+0x70647277fffda63d
 000002ee00000000: nft_pcpu_tun_ctx @ 0x38208+0x2edfffc7df8
-00000000000001f4: <no-symbol>
-0000000300000160: nft_pcpu_tun_ctx @ 0x38208+0x2fffc7f58
-6572747300009ff0: nft_pcpu_tun_ctx @ 0x38208+0x65727472fffd1de8
-000000676e2d7373: nft_pcpu_tun_ctx @ 0x38208+0x676e29f16b
-000002ee00000000: nft_pcpu_tun_ctx @ 0x38208+0x2edfffc7df8
-000000000000035a: <no-symbol>
+0000000000000334: <no-symbol>
 Userspace:
 0000000300000160: <no-symbol>
-6572747300009fee: <no-symbol>
-000000676e2d7373: <no-symbol>
+7064727800012845: <no-symbol>
 000002ee00000000: <no-symbol>
-00000000000001f4: <no-symbol>
+0000000000000334: <no-symbol>
+The stack size is invalid
+Kernel:
+Userspace:
+0044b: <no-symbol>
+Userspace:
 0000000300000160: <no-symbol>
-6572747300009ff0: <no-symbol>
-000000676e2d7373: <no-symbol>
+67726f5800000f17: <no-symbol>
 000002ee00000000: <no-symbol>
+000000000000044b: <no-symbol>
+The stack size is invalid
+Kernel:
+Userspace:
+no-symbol>
 000000000000035a: <no-symbol>
 0000000300000160: <no-symbol>
 6572747300009fed: <no-symbol>

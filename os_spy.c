@@ -239,6 +239,7 @@ int main(int argc, char **argv){
     argp_parse(&argp, argc, argv, 0, NULL, &env_data);
     // 注册信号处理器，捕获Ctrl-C (SIGINT)
     signal(SIGINT, handle_sigint);
+    signal(SIGTERM, handle_sigint);
 
     ret = init_time();
     if(ret != 0)
@@ -341,7 +342,7 @@ int main(int argc, char **argv){
 		    goto cleanup;
     }
 
-    while(1){
+    while(stop == 0){
         if(env_data.net_data){
             if (monitor_network(env_data.visualize) != 0) {
                 fprintf(stderr, "An error occurred during network monitoring.\n");
