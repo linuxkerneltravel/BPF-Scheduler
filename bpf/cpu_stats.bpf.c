@@ -417,7 +417,8 @@ static int task_concerned_update(struct task_cpu_usage *task_usage, u32 threshol
         }
         memset(buff,0,sizeof(struct task_cpu_usage));
         buff->task_info = task_usage->task_info;
-        u64 delta = (now - task_usage->last_clear_time)*10 / HALF_SECOND;
+        //u64 delta = (now - task_usage->last_clear_time)*10 / HALF_SECOND;
+        u64 delta = (HALF_SECOND + task_usage->last_clear_time - now )*10 / HALF_SECOND;
         buff->total_percent = task_usage->total_time_ns * 100 * delta/ HALF_SECOND;
         buff->kernel_percent = task_usage->kernel_time_ns / task_usage->total_time_ns;
         buff->user_percent = task_usage->user_time_ns / task_usage->total_time_ns;
@@ -469,7 +470,8 @@ static int process_concerned_update(struct process_struct *ps, u32 threshold){
             return 0;
         }
         memset(buff,0,sizeof(struct process_struct));
-        u64 delta = (now - ps->last_clear_time) * 10 / HALF_SECOND;
+        //u64 delta = (now - ps->last_clear_time) * 10 / HALF_SECOND;
+        u64 delta = (HALF_SECOND + ps->last_clear_time - now) * 10 / HALF_SECOND;
         buff->tgid = tgid;
         buff->kids_length = ps->kids_length;
         buff->total_use_percent = ps->total_use_time * 100 * delta / HALF_SECOND;
