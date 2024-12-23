@@ -214,14 +214,15 @@ TGID,Kids Length,Total Percent
 
 
 ## 实验
-这部分对应的视频是”cpu部分”，下面所有的图片都是源于这个视频
+这部分对应的视频是”cpu部分”，同样这也是之后scx-nest部分的首个测试视频，下面所有的图片都是源于这个视频，具体数据分析在scx-nest部分详细分析
 
-还是运行前先清理过去文件，cpu部分这里先简单用stress-ng，看看监视程序的监测情况
-![img_3.png](img_3.png)
-
-可以看到stress-ng被正确监测到了，对比task的监测图，可以看到很多tgid也正确监测到了
 ![img_4.png](img_4.png)
 ![img_5.png](img_5.png)
+
+![img_6.png](img_6.png)
+
+对比pid部分和tgid部分可以看到监视程序都成功把stress-ng识别了出来
+
 
 
 

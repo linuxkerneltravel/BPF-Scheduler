@@ -222,3 +222,39 @@ Timestamp,PID,Comm,Delay_us
 
 
 ## 实验
+对应视频链接中的“网络部分”，对于这部分要注意的是我对网络专门编写了个测试程序，具体文件是`visualize/net_test.py`，
+在运行脚本`visualize/net_with_delay.sh`中，可以修改网络平均延迟和掉包率，在上面解析中，我是用笔记本远程控制主机做的，
+所以在`tcptop`中可以看到
+```
+Timestamp,PID,Comm,Sent_Bytes,Received_Bytes
+2024-12-22 22:05:27,79852,xrdp,76064,1976
+```
+同时网络影响和掉包率对系统影响很大，但是虚拟机中没用了远程控制这部分，即便我把平均延迟提高到10ms，掉包率提高到5%，
+对系统整体影响仍然有限，虚拟机中用到网络的任务还是少，重传事件甚至是空的
+
+![img_12.png](img_12.png)
+
+![img_13.png](img_13.png)
+
+![img_14.png](img_14.png)
+
+![img_15.png](img_15.png)
+
+![img_16.png](img_16.png)
+
+![img_17.png](img_17.png)
+
+![img_18.png](img_18.png)
+
+
+
+
+
+
+
+
+
+
+
+
+

@@ -62,6 +62,8 @@ bpf/                                 # eBPF 程序目录
 ├── sched_ext.c                     # scx-nest模块用户态代码
 └── scx_nest.c                      # 弃用
 ```
+我在这里进一步强调一下，scx_spy.c是scx分支的目标文件，拥有包括sched_ext的完整功能，os_spy.c是main分支的目标文件，拥有整个系统监测的功能
+
 ## cpu监测部分
 编译好之后，对于普通版本和sched_ext的版本分别这样执行
 ```shell
@@ -492,7 +494,7 @@ void BPF_STRUCT_OPS(nest_enqueue, struct task_struct *p, u64 enq_flags)
 			       enq_flags);
 }
 ```
-在内核态的bpf文件的改进的重要部分就在这里，关于基于scc-nest的调度实验，在[这里](Document/sched_ext/sched_ext.md)
+在内核态的bpf文件的改进的重要部分就在这里，关于基于scc-nest的调度实验，在[这里](Document/scx-nest.md)
 
 
 

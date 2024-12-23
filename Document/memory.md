@@ -334,5 +334,15 @@ struct oom_event {
 
 
 ## 实验
+具体对应的是链接中的“memory部分”
 
+![img_19.png](img_19.png)
+
+![img_20.png](img_20.png)
+
+![img_21.png](img_21.png)
+
+![img_22.png](img_22.png)
+
+![img_23.png](img_23.png)
 
