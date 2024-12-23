@@ -82,28 +82,35 @@ sda1       0.00         0.00         0          0.00
 
 
 ## 对写入或读取超阈值的task进行监视
-建立io_task_stats_map对task的读取量和写入量进行映射，通过挂载在`tracepoint/syscalls/sys_enter_write`和`tracepoint/syscalls/sys_enter_read`实现具体的统计，
-类似cpu部分的，通过`io_task_compare_and_commit(struct io_task_stats *task)`实现对超过阈值的task进行perf输出，
-考虑到IO的特殊性，我这里把阈值的限定放到了用户态来定义，在用户态的默认值是
+1. 对写入或读取超阈值的任务进行监视
+   - 实现方式
+     - 建立 io_task_stats_map，用于映射每个任务的读取量和写入量
+     - 挂载在以下 tracepoint 节点
+       - tracepoint/syscalls/sys_enter_write：统计写入调用次数
+       - tracepoint/syscalls/sys_enter_read：统计读取调用次数
+   - 实现逻辑
+     - 通过 io_task_compare_and_commit(struct io_task_stats *task) 函数，对超过阈值的任务进行捕获并触发 perf 输出
+2. 阈值定义
+   - 统计目标：在指定时间窗口内的读取和写入调用次数，即读写频率
+   - 具体结构为
 ```c
 struct io_stats_threhold task = {
-        .read_count = 50,
-        .write_count = 50,
-        .time_window = (1000 * MSEC) // 1s
-    };
+    .read_count = 50,
+    .write_count = 50,
+    .time_window = (1000 * MSEC) // 1s
+};
 ```
-我这里统计的是调用读写的次数，结合时间可以看作读写的频率，超过这个频率的就会被记录，
-同时根据距离时间窗口末尾的时间，对提早打倒阈值的乘个系数
+    - 提前达到阈值的调整：对于提前达到阈值的任务，根据距离时间窗口末尾的时间，动态调整统计值
 ```c
 u64 time_spare = task->last_clear_time + threhold->time_window - now;
 time_spare = time_spare * 100 / threhold->time_window;
 time_spare = (u32)time_spare;
-if(time_spare > 10)
-{
+if (time_spare > 10) {
     buff->write_count *= (time_spare / 10);
     buff->read_count *= (time_spare / 10);
 }
 ```
+
 
 对于结果的输出，本地的数据保存在`visualize/run/io_task_stats.csv`
 ```
@@ -128,7 +135,12 @@ PID,Command,Read Count,Write Count
 ```
 
 ## 对写入或读取超阈值的process进行监视
-类似于task记录的部分，对应的map是io_process_stats_map
+- 实现方式
+  - 类似于任务的监视机制，但统计的单位为进程
+  - 使用 io_process_stats_map 记录每个进程的 IO 行为
+- 特点
+  - 通过相同的逻辑判断超阈值的进程，并触发 perf 输出
+  - 便于从全局视角监控占用 IO 资源较多的进程
 
 数据存储在本地的`visualize/run/io_process_stats`
 ```
@@ -146,8 +158,15 @@ TGID,Read Count,Write Count
 ```
 
 ## 对IO请求的相应延迟
-通过挂载在`tracepoint/block/block_rq_issue`记录请求开始的时间，然后通过挂载`tracepoint/block/block_rq_complete`记录请求结束时间，
-然后统计时间差得到响应延迟，然后统计计数，具体的本地数据存储在`visualize/run/iowait_perf`
+- 延迟计算
+  - 挂载在以下 tracepoint 节点
+    - tracepoint/block/block_rq_issue：记录 IO 请求开始的时间
+    - tracepoint/block/block_rq_complete：记录 IO 请求完成的时间
+  - 计算请求延迟为两次时间记录的差值
+- 延迟统计
+  - 对请求延迟进行计数统计，记录延迟分布数据
+
+具体的本地数据存储在`visualize/run/iowait_perf`
 
 ```
 1us,4us,16us,64us,256us,1ms,4ms,4ms+

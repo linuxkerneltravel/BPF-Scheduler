@@ -103,8 +103,14 @@ root@ne0-System:~# bpftool link show
 挂载了14个ebpf程序，raw_tracepoint 2个，tracepoint 10 个，perf_event 2 个
 
 ## cpu使用情况
-通过挂载在在sched_switch、cpu_idle、sys_enter、sys_exit、softirq_entry、softirq_exit、
-irq_handler_entry、irq_handler_exit等节点实现对于cpu不同的功能的使用率的统计
+通过挂载在以下内核节点上的 BPF 程序，对 CPU 不同功能的使用率进行统计：
+- 运行时间：sched_switch
+- 空闲状态：cpu_idle
+- 内核态或用户态：sys_enter 和 sys_exit
+- 软中断：softirq_entry 和 softirq_exit
+- 硬中断：irq_handler_entry 和 irq_handler_exit
+
+这些节点的挂载覆盖 CPU 的各种工作状态，支持系统级别的使用率分析
 
 本地文件保存在`visualize/run/cpu_usage.csv`中，格式如下
 ```
@@ -125,15 +131,17 @@ CPU ID,User Time,Kernel Time,Idle Time,IRQ Time,SoftIRQ Time
 每500ms用perf事件输出一次
 
 ## cpu占用率高的线程的情况
-对于所有的task都有个`struct task_cpu_usage`存储它的cpu使用情况，记录在task_cpu_usage_map中，
-同时有个`task_concerned_update(struct task_cpu_usage *task_usage, u32 threshold)`函数，
-来判断同时把占用率高于阈值的task移入`thread_occupied_map`同时perf输出。
-
-对于这边的perf输出有个注意点就是，对于这里占用率的更新也是500ms清理一次，为了保证提前超过阈值的task不会重复输出，
-我这里设置了参数来确保这个，同时对于提前到达阈值的task，根据提前的比例对占用率进行线性增长，具体来说算法如下
-```c
-u64 delta = (HALF_SECOND + task_usage->last_clear_time - now )*10 / HALF_SECOND;
-```
+系统为每个任务维护了一个 struct task_cpu_usage 数据结构，用于存储线程的 CPU 使用情况，并记录在 task_cpu_usage_map 中。
+同时，通过以下机制对高占用线程进行捕获和输出：
+1. 高占用线程的捕获
+   - 使用函数 task_concerned_update(struct task_cpu_usage *task_usage, u32 threshold)
+   - 该函数对线程的 CPU 占用情况进行判断，并将占用率高于阈值的线程移入 thread_occupied_map，并触发 perf 输出
+2. 输出优化
+   - 每 500 毫秒清理一次占用率记录
+   - 设置参数确保提前超过阈值的线程不会被重复输出
+   - 对于提前达到阈值的线程，其占用率根据时间比例进行线性增长，公式如下
+   
+   `u64 delta = (HALF_SECOND + task_usage->last_clear_time - now) * 10 / HALF_SECOND;`
 
 输出保存在`visualize/run/task_usage.csv`
 ```
@@ -150,9 +158,14 @@ PID,Name,Total Percent,Kernel Percent,User Percent
 ```
 
 ## cpu占用率高的进程的情况
-和task统计的思路差不多，就是把统计的身份从pid改为了tgid，由`process_map`来存储所有的进程的cpu占用情况，
-由`process_concerned_update(struct process_struct *ps, u32 threshold)`来对占用率高的进程记录和输出，
-具体是用`process_occupied_map`记录和perf输出
+统计高占用进程的逻辑与线程类似，但记录维度由 pid 转换为 tgid（进程 ID）。具体实现包括：
+1. 进程 CPU 使用记录
+   - 所有进程的 CPU 使用情况存储在 process_map 中
+   - 通过 process_concerned_update(struct process_struct *ps, u32 threshold) 函数，判断高占用进程并触发记录与输出
+2. 高占用进程的管理与输出
+   - 高占用进程的信息存储在 process_occupied_map 中，并通过 perf 输出
+
+这种设计与线程统计一致，便于从线程和进程两个维度捕获 CPU 高占用的异常行为
 
 输出保存在`visualize/run/process_stat.csv`
 ```
@@ -168,9 +181,17 @@ TGID,Kids Length,Total Percent
 
 
 ## 调度延迟
-参考自runqlat功能，主要用于监控和分析系统中任务等待 CPU 调度的时间分布，即运行队列等待时间
+调度延迟功能参考自 runqlat，用于监控任务等待 CPU 调度的时间分布。其具体实现特点如下：
+1. 时间区间统计
+   - 将任务等待调度的时间分为 8 个区间，分别代表不同的等待时间范围
+   - 数据记录为累计值，从 BPF 程序启动开始，每 500 毫秒更新一次
+2. 反映 CPU 压力
+   - 累计值反映系统中任务的调度延迟分布，从中可以评估当前 CPU 的压力情况
+   - 当存在异常任务占用大量 CPU 时，后几个区间的值会增长更快，表明调度压力显著增加
 
-简单来说我建立了一个`runqlat_map`，分为8索引，从输出来看更清楚，本地文件是在`visualize/run/runqlat`
+通过分析调度延迟，可以快速判断系统当前的调度健康状况，并为异常任务的定位提供依据
+
+本地文件是在`visualize/run/runqlat`
 ```
 1us,4us,16us,64us,256us,1ms,4ms,4ms+
 4384,570,252,36,0,0,0,0
@@ -190,9 +211,6 @@ TGID,Kids Length,Total Percent
 6986,2737,1827,626,10,9,3,1
 7192,2821,1874,659,11,9,3,1
 ```
-具体来说分为了8个区间，分别代表了在队列等待的时间，数据记载的是累计值，从ebpf程序运行开始，
-每500ms输出一次，记录到当前位置，任务调度延迟在某个区间的累计值，从中反映出当前系统的cpu压力情况，
-当存在异常任务占用大量cpu，那么后面几个区间的值就会增长更快
 
 
 ## 实验

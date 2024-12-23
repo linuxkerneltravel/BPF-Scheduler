@@ -88,7 +88,14 @@ docker0,0,0,0,0,0,0,0,0
 从这些信息得到系统整体的网络接口的流量统计数据表本地数据在[这里](visualize/proc/net.csv)
 
 ## tcptop
-
+tcptop 用于显示系统中基于 TCP 协议的网络流量统计信息，包括每个进程的发送和接收流量
+- 实现方式
+  - 挂载在以下内核节点
+    - kprobe/tcp_sendmsg 和 kretprobe/tcp_sendmsg：获取任务的发送字节数
+    - kprobe/tcp_cleanup_rbuf：获取任务的接收字节数
+- 功能特点
+  - 实时统计每个进程的网络发送和接收流量
+  - 帮助快速定位高流量的任务或进程，便于分析系统的网络行为
 
 
 ```
@@ -114,6 +121,13 @@ Timestamp,PID,Comm,Sent_Bytes,Received_Bytes
 
 
 ## tcprtt
+tcprtt 用于显示系统中基于 TCP 连接的往返时间（Round-Trip Time, RTT）分布情况
+- 实现方式
+  - 挂载在 fentry/tcp_rcv_established 节点
+  - 获取 sock 中的 srtt_us 字段，提取往返时间
+- 功能特点
+  - 每秒通过 perf 输出统计数据，展示不同 RTT 区间的网络请求分布
+  - 帮助分析系统网络延迟情况，评估网络性能
 
 
 ```
@@ -143,14 +157,20 @@ Timestamp,PID,Comm,Sent_Bytes,Received_Bytes
 15,35,525,75,94,1,0,0
 15,35,525,101,102,1,0,0
 15,35,525,102,103,1,0,0
-15,35,525,102,105,1,69,0
 ```
 运行的本地结果存储在[这里](visualize/run/tcprtt.csv)
 
 
 ## tcpretrans
+tcpretrans 用于显示系统中发生的 TCP 重传事件，定位具体的任务和连接
+- 实现方式
+  - 挂载在 tracepoint/tcp/tcp_retransmit_skb 节点
+  - 捕获每次 TCP 数据包重传事件
+- 功能特点
+  - 精确记录发生重传的任务信息，包括 PID、源 IP 和目标 IP 等
+  - 帮助分析网络抖动、丢包等问题，优化系统网络传输性能
 
-
+网络这部分的数据都是通过`visualize/net_with_delay.sh`这个来模拟的，这个脚本会加入给系统加入一定的延迟和掉包率，运行60s
 ```
 Timestamp,PID,Comm,State,Event_Type,Source_IP,Source_Port,Destination_IP,Destination_Port
 2024-12-22 22:18:31.175572385,81508,python3,ESTABLISHED,1,::ffff:10.193.121.196,15629,::ffff:10.196.79.194,61794
@@ -174,6 +194,16 @@ Timestamp,PID,Comm,State,Event_Type,Source_IP,Source_Port,Destination_IP,Destina
 
 
 ## tcp连接延迟
+用于监控 TCP 连接建立过程中的延迟情况
+- 实现方式
+  - 挂载在以下内核节点
+    - tcp_v4_connect 和 tcp_v6_connect：捕获 IPv4 和 IPv6 的 TCP 连接请求
+    - tcp_rcv_state_process：捕获 TCP 状态处理事件
+- 功能特点
+  - 记录从连接请求到完成的时间间隔，精确评估 TCP 连接延迟
+  - 帮助发现可能导致连接延迟的网络或系统问题
+
+
 
 ```
 Timestamp,PID,Comm,Delay_us
@@ -189,3 +219,6 @@ Timestamp,PID,Comm,Delay_us
 ```
 运行的本地结果存储在[这里](visualize/run/net_latency.csv)
 
+
+
+## 实验

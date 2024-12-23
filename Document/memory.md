@@ -241,11 +241,25 @@ Committed AS: 13347864 kB (27.49%)
 
 
 ## task和process的内存分配频率记录
+- 挂载点：程序挂载到以下内核 tracepoint 节点，记录内存分配与释放的频率
+  - 分配相关
+    - `tracepoint/kmem/kmalloc`
+    - `tracepoint/kmem/mm_page_alloc`
+    - `tracepoint/kmem/kmem_cache_alloc`
+  - 释放相关
+    - `tracepoint/kmem/kfree`
+    - `tracepoint/kmem/mm_page_free`
+    - `tracepoint/kmem/kmem_cache_free`
+- 记录维度
+  - 任务级：每个任务的内存分配频率统计
+    - 使用 task_compare_and_commit(struct task_mm_stats *task) 函数
+    - 捕获频繁进行内存分配和释放的异常任务
+  - 进程级：每个进程的内存分配频率统计
+    - 使用 process_compare_and_commit(struct process_mm_stats *process) 函数
+    - 对异常进程的内存操作进行记录
 
-把程序挂载到`tracepoint/kmem/kmalloc`、`tracepoint/kmem/kfree`、`tracepoint/kmem/mm_page_alloc`、`tracepoint/kmem/mm_page_free`、
-`tracepoint/kmem/kmem_cache_alloc`、`tracepoint/kmem/kmem_cache_free`节点，记录task和process的内存分配频率
+捕获高频率分配或释放内存的任务和进程，定位内存泄漏或频繁内存操作引发的性能问题
 
-对于task和process分别用`task_compare_and_commit(struct task_mm_stats *task)`和`process_compare_and_commit(struct process_mm_stats *process)`把异常任务记录，
 数据在本地的[这里](visualize/run/task_mm_stats.csv)和[这里](visualize/run/process_mm_stats.csv)
 
 
@@ -300,15 +314,20 @@ TGID,Kmem Count,Vmem Count,Slab Count
 ```
 
 ## oom事件记录
-把程序挂载到`kprobe/oom_kill_process`，然后用下面结构体把数据传到用户态
+- 挂载点
+  - 挂载到 kprobe/oom_kill_process，捕获系统触发 OOM 事件时的详细信息
+- 数据结构
+  - OOM 事件的数据通过以下结构体传递到用户态
 ```c
-struct oom_event{
-	u32 trigger_id;// 触发 OOM 的进程 PID
-	u32 killed_id;// 被 OOM 杀死的进程 PID
-	char comm[TASK_COMM_LEN];// 被杀死进程的命令名
-	u64 kill_time;
+struct oom_event {
+    u32 trigger_id;         // 触发 OOM 的进程 PID
+    u32 killed_id;          // 被 OOM 杀死的进程 PID
+    char comm[TASK_COMM_LEN]; // 被杀死进程的命令名
+    u64 kill_time;          // OOM 发生的时间戳
 };
 ```
+精确记录 OOM 事件的触发与受害者，便于快速分析内存不足的原因，结合内存分配频率数据，可以深入定位异常任务或进程
+
 数据在本地的[这里](visualize/run/oom_event.csv)
 
 
