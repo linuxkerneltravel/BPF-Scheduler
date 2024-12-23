@@ -214,6 +214,14 @@ TGID,Kids Length,Total Percent
 
 
 ## 实验
+这部分对应的视频是”cpu部分”，下面所有的图片都是源于这个视频
+
+还是运行前先清理过去文件，cpu部分这里先简单用stress-ng，看看监视程序的监测情况
+![img_3.png](img_3.png)
+
+可以看到stress-ng被正确监测到了，对比task的监测图，可以看到很多tgid也正确监测到了
+![img_4.png](img_4.png)
+![img_5.png](img_5.png)
 
 
 

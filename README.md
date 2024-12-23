@@ -18,6 +18,9 @@
 
 补充一下，这个分支主要都是我在虚拟机上写的，一直git更新的用户就是我的GitHub账号 https://github.com/restart126
 
+所有的视频文件都来自链接: https://pan.baidu.com/s/1h8lBofO8eoIwl1hw-mHSJA?pwd=osos 提取码: osos
+
+
 ## 环境搭建
 对于具体的环境配置还有代码的运行环境，一切都在[这里](Document/环境搭建.md)，为了简洁这里就不多介绍了
 
@@ -489,7 +492,7 @@ void BPF_STRUCT_OPS(nest_enqueue, struct task_struct *p, u64 enq_flags)
 			       enq_flags);
 }
 ```
-在内核态的bpf文件的改进的重要部分就在这里，接下来讲讲调度器和系统性能分析程序的联动
+在内核态的bpf文件的改进的重要部分就在这里，关于基于scc-nest的调度实验，在[这里](Document/sched_ext/sched_ext.md)
 
 
 

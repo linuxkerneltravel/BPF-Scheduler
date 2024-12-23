@@ -741,12 +741,14 @@ static int attach_scx_skel()
     }
 
     //int cores = 0;
-    FILE *fp = popen("grep -c '^processor' /proc/cpuinfo", "r");
-    if (fp) {
-        fscanf(fp, "%d", &cores);
-        pclose(fp);
+    if(cores == 0)
+    {
+        FILE *fp = popen("grep -c '^processor' /proc/cpuinfo", "r");
+        if (fp) {
+            fscanf(fp, "%d", &cores);
+            pclose(fp);
+        }
     }
-
     // 初始化只读数据
     //scx_skel->rodata->nr_cpus = libbpf_num_possible_cpus();
     scx_skel->rodata->nr_cpus = cores;
@@ -3054,7 +3056,16 @@ static int attach_cpu_skel(){
         return 1;
     }
 
-    int nr_cpu = libbpf_num_possible_cpus();
+    //int nr_cpu = libbpf_num_possible_cpus();
+    if(cores == 0){
+        FILE *fp = popen("grep -c '^processor' /proc/cpuinfo", "r");
+        if (fp) {
+            fscanf(fp, "%d", &cores);
+            pclose(fp);
+        }
+    }
+
+    int nr_cpu = cores;
     if(nr_cpu < 0)
     {
         fprintf(stderr,"libbpf: get cpu nums failed \n");
