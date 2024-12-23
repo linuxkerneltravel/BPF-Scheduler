@@ -2,9 +2,9 @@
 
 DEV=enp5s0  # 网络接口名称，可根据需要修改
 DELAY_MEAN=10  # 平均延迟（毫秒）
-DELAY_JITTER=5  # 延迟波动范围（毫秒）
+DELAY_JITTER=10  # 延迟波动范围（毫秒）
 DELAY_DISTRIBUTION="normal"  # 延迟分布类型（normal, uniform, pareto, paretonormal）
-LOSS_RATE=2  # 丢包率百分比（例如，5表示5%）
+LOSS_RATE=5  # 丢包率百分比（例如，5表示5%）
 
 # 添加网络延迟和丢包
 add_network_delay() {

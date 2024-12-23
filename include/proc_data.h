@@ -441,7 +441,8 @@ int process_disk_stats(DiskStatsContext* context, DiskStats* current, int* devic
 }
 
 /*-------------------------------网络部分----------------------------------------*/
-const char *proc_net_save = "/home/ne0/sys_competition/start/cpu_watcher/visualize/proc";
+//const char *proc_net_save = "/home/ne0/sys_competition/start/cpu_watcher/visualize/proc";
+char proc_net_save[MAX_PATH_LEN];
 FILE *proc_net_file = NULL; 
 FILE *sys_net_file = NULL;
 
@@ -464,8 +465,28 @@ static inline void safe_fclose(FILE *fp) {
     }
 }
 
+static int get_proc_net_path(){
+    int ret;
+    // 获取当前工作目录
+    if (getcwd(proc_net_save, sizeof(proc_net_save)) == NULL) {
+        perror("getcwd failed");
+        return 1;
+    }
+
+    sprintf(proc_net_save, "%s/visualize/proc", proc_net_save);
+    
+    return 0;
+}
+
+
 // 初始化 CSV 文件
 void init_proc_net_csv_file() {
+    int ret = get_proc_net_path();
+    if(ret != 0){
+        fprintf(stderr, "Failed to get proc net path\n");
+        return;
+    }
+
     char file_path[256];
     snprintf(file_path, sizeof(file_path), "%s/net.csv", proc_net_save);
 

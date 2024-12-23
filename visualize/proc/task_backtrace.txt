@@ -1,19 +1,16 @@
 The stack size is invalid
 Kernel:
 0000000300000160: __per_cpu_end @ 0x3a000+0x2fffc6160
-7470706300000e2b: __per_cpu_end @ 0x3a000+0x74707062fffc6e2b
-00000000736c6f6f: __per_cpu_end @ 0x3a000+0x7368cf6f
-0000058400000000: __per_cpu_end @ 0x3a000+0x583fffc6000
-0000000000000365: <no-symbol>
+5f7863730000127b: __per_cpu_end @ 0x3a000+0x5f786372fffc727b
+0000000000797073: __per_cpu_end @ 0x3a000+0x75d073
+0000016e00000000: __per_cpu_end @ 0x3a000+0x16dfffc6000
+00000000000000c8: <no-symbol>
 Userspace:
 0000000300000160: <no-symbol>
-7470706300000e2b: <no-symbol>
-00000000736c6f6f: <no-symbol>
-0000058400000000: <no-symbol>
-0000000000000365: <no-symbol>
-The stack size is invalid
-Kernel:
-Userspace:
+5f7863730000127b: <no-symbol>
+0000000000797073: <no-symbol>
+0000016e00000000: <no-symbol>
+00000000000000c8: <no-symbol>
 The stack size is invalid
 Kernel:
 Userspace:
