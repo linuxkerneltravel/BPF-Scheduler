@@ -346,3 +346,13 @@ struct oom_event {
 
 ![img_23.png](img_23.png)
 
+对于csv数据也都做了可视化处理，对于memory部分的就在`visualize/mm_data_analyse.py`，这里展示部分统计图
+
+![task_kmem_count.png](task_kmem_count.png)
+
+![task_slab_count.png](task_slab_count.png)
+
+![task_slab_count_xorg.png](task_slab_count_xorg.png)
+
+![task_vmem_count.png](task_vmem_count.png)
+

@@ -203,3 +203,7 @@ TGID,Read Count,Write Count
 ![img_10.png](img_10.png)
 
 ![img_11.png](img_11.png)
+
+对于csv数据也都做了可视化处理，对于io部分的就在`visualize/io_data_analyse.py`，这里展示部分统计图
+
+![io_task_write.png](io_task_write.png)

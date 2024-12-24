@@ -246,11 +246,11 @@ Timestamp,PID,Comm,Sent_Bytes,Received_Bytes
 
 ![img_18.png](img_18.png)
 
+对于csv数据也都做了可视化处理，对于net部分的就在`visualize/net_data_analyse.py`，这里展示部分统计图
 
+![net_sent.png](net_sent.png)
 
-
-
-
+![recieve_bytes.png](recieve_bytes.png)
 
 
 

@@ -34,7 +34,7 @@
 
 ## 代码架构
 核心的文件夹是include（定义了一些结构体和函数）和bpf（这里是内核态bpf代码的部分）
-```shell
+```
 include/                        # 头文件目录
 ├── bpf-compat/                 # scx需要的部分
 ├── scx/                        # scx需要的部分
@@ -50,7 +50,7 @@ include/                        # 头文件目录
 ├── scx_nest.h                  # scx-nest部分
 └── scx_nest_stats_table.h      # scx-nest部分
 ```
-```shell
+```
 bpf/                                 # eBPF 程序目录
 ├── cpu_stats.bpf.c                 # CPU 性能统计的 eBPF 程序
 ├── io_stats.bpf.c                  # IO 性能监控的 eBPF 程序
@@ -59,7 +59,7 @@ bpf/                                 # eBPF 程序目录
 ├── net_stats.bpf.c                 # 网络性能监控的 eBPF 程序
 └── scx_nest.bpf.c                  # scx-nest相关的 eBPF 程序
 ```
-```shell
+```
 /                                   # 项目的用户态代码部分，各个模块都先测试，然后整合在一起
 ├── io_spy.c                        # IO 监控模块用户态代码
 ├── cpu_spy.c                       # cpu 监控模块用户态代码，因为是第一个写的模块，写的一般，在最终的os_spy和scx_spy中都改了很多
@@ -70,6 +70,19 @@ bpf/                                 # eBPF 程序目录
 ├── sched_ext.c                     # scx-nest模块用户态代码
 └── scx_nest.c                      # 弃用
 ```
+```
+visualize/                          # 可视化部分与文档输出
+├── run/                            # 程序运行时候存储的本地csv文件
+├── proc/                           # 程序运行时候不适合输出到Grafana的部分输出
+├── cpu_data_analyse.py             # CPU 本地数据传递给Prometheus
+├── io_data_analyse.py              # IO 本地数据传递给Prometheus
+├── mm_data_analyse.py              # 内存本地数据传递给Prometheus
+├── net_data_analyse.py             # 网络本地数据传递给Prometheus
+├── net_test.py                     # 网络测试脚本的辅助脚本，配合net_with_delay.sh
+├── net_with_delay.sh               # 网络测试脚本，里面可以自定义延迟和掉包率，测试60s
+└── visual.sh                       # 运行它可以同时把所有传递Prometheus的脚本（*_data_analyse.py）都运行
+```
+
 我在这里进一步强调一下，scx_spy.c是scx分支的目标文件，拥有包括sched_ext的完整功能，os_spy.c是main分支的目标文件，拥有整个系统监测的功能
 
 ## cpu监测部分

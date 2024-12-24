@@ -223,8 +223,12 @@ TGID,Kids Length,Total Percent
 
 对比pid部分和tgid部分可以看到监视程序都成功把stress-ng识别了出来
 
+对于csv数据也都做了可视化处理，对于cpu部分的就在`visualize/cpu_data_analyse.py`，这里展示部分统计图
+
+![process_cpu_total.png](process_cpu_total.png)
 
 
+![task_total_cpu.png](task_total_cpu.png)
 
 
 
