@@ -55,8 +55,8 @@ const volatile u64 slice_ns = SCX_SLICE_DFL; // 默认时间片长度，具体�
 const volatile bool find_fully_idle = false; // 是否启用寻找完全空闲核心的策略，false表示不启用
 const volatile u64 sampling_cadence_ns = 1 * NSEC_PER_SEC; // 采样间隔时间，单位为纳秒
 const volatile u64 r_depth = 5; // Reserve nest的搜索深度限制
+const volatile bool filter_by_tgid = false;
 
-const char bad_guy[] = "stress-ng"; // 用于标识恶意任务的名称
 
 // 用于统计信息跟踪。这些值可能会有滞后
 u64 stats_primary_mask, stats_reserved_mask, stats_other_mask, stats_idle_mask;
@@ -109,29 +109,6 @@ struct task_info_simple{
     char comm[TASK_COMM_LEN];
 };
 
-struct task_cpu_usage {
-    struct  task_info_simple task_info;
-
-    //bool already_backtrace;
-    bool in_kernel;
-    bool in_process;
-    bool already_output;
-
-    u64 user_time_ns;       
-    u64 kernel_time_ns;     
-    u64 total_time_ns;     
-    u64 last_run_time; 
-    u64 last_enqeue_time;
-
-    u64 wait_time;
-    u64 last_clear_time;
-    u64 last_trace_time;
-
-    u32 user_percent;       
-    u32 kernel_percent;     
-    u32 total_percent;     
-};
-
 // 任务的调度上下文 (task_ctx)
 struct {
 	__uint(type, BPF_MAP_TYPE_TASK_STORAGE);
@@ -173,42 +150,20 @@ struct {
 } stats_timer SEC(".maps");
 
 /*-----------------和cpu_stats交互来抑制异常task-----------------------*/
-struct cpu_bad_guys {
-	__uint(type, BPF_MAP_TYPE_HASH);
-	__uint(max_entries, 512);
-	__type(key, u32);
-	__type(value, u32);
-} cpu_bad_guys_map SEC(".maps");
-
-// struct{
-// 	__uint(type, BPF_MAP_TYPE_ARRAY_OF_MAPS);
-// 	__uint(max_entries, 1);
-// 	__type(key, u32);
-// 	__type(value, int); // 子 Map 的文件描述符
-// } cpu_filter_ids SEC(".maps");
-
-struct{
-	__uint(type, BPF_MAP_TYPE_ARRAY_OF_MAPS);
-	__uint(max_entries, 1);
-	__type(key, u32);
-	__array(values,struct cpu_bad_guys);
-} cpu_filter_ids SEC(".maps");
-
-
-struct task_cpu_usage_map {
+struct filter_inner_map {
 	__uint(type, BPF_MAP_TYPE_HASH);
 	__uint(max_entries, 102400);
 	__type(key, u32);
-	__type(value, struct task_cpu_usage);
-} task_usage_map SEC(".maps");
+	__type(value, u32);
+} template_map SEC(".maps");
 
 
 struct{
 	__uint(type, BPF_MAP_TYPE_ARRAY_OF_MAPS);
 	__uint(max_entries, 1);
 	__type(key, u32);
-	__array(values,struct task_cpu_usage_map);
-} cpu_task_usage_map SEC(".maps");
+	__array(values,struct filter_inner_map);
+} fliter_map SEC(".maps");
 
 
 // 处理用户态传的可能被误伤的任务名
@@ -226,6 +181,22 @@ struct {
 	__type(key, struct comm_info);
 	__type(value, u32);
 } comm_attention_map SEC(".maps");
+
+// 处理用户态传的可能被误伤的任务pid or tgid
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, u32);
+	__type(value, u32);
+} id_ignore_map SEC(".maps");
+
+// 处理用户态传的要去特别注意的任务pid or tgid
+struct {
+	__uint(type, BPF_MAP_TYPE_HASH);
+	__uint(max_entries, 1024);
+	__type(key, u32);
+	__type(value, u32);
+} id_attention_map SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -349,14 +320,37 @@ static int operate_bad_guys(struct task_struct *p,u64 enq_flags){
 		return 1;
 	struct comm_info name;
 	bpf_probe_read_kernel_str(name.comm,sizeof(p->comm),p->comm);
+
+	u32 pid = p->pid;
+	u32 tgid = p->tgid;
+
 	// 跳过误伤名单的
 	u32 *ident = bpf_map_lookup_elem(&comm_ignore_map,&name);
 	if(ident){
 		return 1;
 	}
+
+	u32 *ident_id;
+
+	ident = bpf_map_lookup_elem(&id_ignore_map,&pid);
+	if(ident){
+		return 1;
+	}
+	if(filter_by_tgid){
+		ident = bpf_map_lookup_elem(&id_ignore_map,&tgid);
+		if(ident){
+			return 1;
+		}
+	}
+
 	// 对特别关注的问题任务控制调度
 	ident = bpf_map_lookup_elem(&comm_attention_map,&name);
-	if(ident){
+	ident_id = bpf_map_lookup_elem(&id_attention_map,&pid);
+	u32 *ident_tgid = NULL;
+	if(filter_by_tgid){
+		ident_tgid = bpf_map_lookup_elem(&id_attention_map,&tgid);
+	}
+	if(ident || ident_id || ident_tgid){
 		u64 vtime = p->scx.dsq_vtime;// 获取任务的虚拟时间
 		if (vtime_before(vtime, vtime_now - slice_ns))
 			vtime = vtime_now - slice_ns;
@@ -364,9 +358,9 @@ static int operate_bad_guys(struct task_struct *p,u64 enq_flags){
 			       enq_flags);
 		return 0;
 	}
+
 	u32 zero = 0;
-	struct cpu_bad_guys *bad_guy = bpf_map_lookup_elem(&cpu_filter_ids,&zero);
-	u32 pid = p->pid;
+	struct filter_inner_map *bad_guy = bpf_map_lookup_elem(&fliter_map,&zero);
 	if(bad_guy){
 		ident = bpf_map_lookup_elem(bad_guy,&pid);
 		if(ident){
