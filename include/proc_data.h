@@ -757,8 +757,8 @@ int monitor_network(bool visualize) {
     int tcp_count = 0;
     int udp_count = 0;
 
-    if(visualize)
-        init_proc_net_csv_file();
+    //if(visualize)
+    init_proc_net_csv_file();
 
     // 读取网络接口统计
     if (read_net_dev(&dev_stats, &dev_count) != 0) {
