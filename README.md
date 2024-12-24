@@ -533,7 +533,7 @@ void BPF_STRUCT_OPS(nest_enqueue, struct task_struct *p, u64 enq_flags)
 			       enq_flags);
 }
 ```
-在内核态的bpf文件的改进的重要部分就在这里，关于基于scc-nest的调度实验，在[这里](Document/scx-nest.md)
+在内核态的bpf文件的改进的重要部分就在这里，关于基于scx-nest的调度实验，在[这里](Document/scx-nest.md)
 
 
 
