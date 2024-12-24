@@ -24,6 +24,14 @@
 ## 环境搭建
 对于具体的环境配置还有代码的运行环境，一切都在[这里](Document/环境搭建.md)，为了简洁这里就不多介绍了
 
+## 对系统性能的影响
+在htop的输出中可以很清晰的显示出来
+![img_32.jpg](Document%2Fimg_32.jpg)
+
+![img_33.jpg](Document%2Fimg_33.jpg)
+
+启用sched_ext调度器会使得cpu占用率有所上升，但整体仍然不超过1%
+
 ## 代码架构
 核心的文件夹是include（定义了一些结构体和函数）和bpf（这里是内核态bpf代码的部分）
 ```shell
@@ -151,7 +159,7 @@ tcpretrans记录系统中 TCP 重传的具体事件，精确定位是哪些任�
 具体的情况和实验请看[这里](Document/net.md)
 
 ## scx-nest调度器设计
-在讲基于sched_ext的调度器设计之前，需要先补充一下Linux调度器的大体架构，详细的讲解分别在
+在讲基于sched_ext的调度器设计之前，需要先补充一下Linux调度器的大体架构，我对这里做过详细的分析，文档在这里
 - [task_struct结构体分析](Document/sched/任务的内核态表示.md)
 - [Linux内核调度器介绍](Document/sched/调度.md)
 - [sched_ext架构介绍](Document/sched_ext/sched_ext.md)
