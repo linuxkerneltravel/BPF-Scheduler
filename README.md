@@ -12,8 +12,13 @@
      处理 TCP 重传事件，监控数据包的重传情况
 
 2. 基于sched_ext的自动化控制
-
-   在上述观测数据的基础上，本项目进一步结合 Linux 内核最新引入的 sched_ext 调度扩展技术，通过实时数据驱动，实现自动化的系统性能优化和资源调度控制。
+- 在上述观测数据的基础上，本项目进一步结合 Linux 内核最新引入的 sched_ext 调度扩展技术，通过实时数据驱动，实现自动化的系统性能优化和资源调度控制。
+- 以往的基于ebpf的性能分析程序，除了网络部分之外，基本都是止步于监测，难以对有问题的任务进行有效而灵活的控制
+- 从今年9月份sched_ext引入内核后，用户态自定义内核调度器成为可能，本项目首先对内核调度器架构进行了深入的解析
+  - 任务的内核态表示 —— task_struct
+  - Linux调度器子系统的整体架构
+  - sched_ext的整体架构
+- 在深入理解原理之上，本项目完善了一个调度器，经过测试在高压情况下要性能要明显优于系统默认的CFS调度器
 
 
 补充一下，这个分支主要都是我在虚拟机上写的，一直git更新的用户就是我的GitHub账号 https://github.com/restart126
@@ -81,6 +86,19 @@ visualize/                          # 可视化部分与文档输出
 ├── net_test.py                     # 网络测试脚本的辅助脚本，配合net_with_delay.sh
 ├── net_with_delay.sh               # 网络测试脚本，里面可以自定义延迟和掉包率，测试60s
 └── visual.sh                       # 运行它可以同时把所有传递Prometheus的脚本（*_data_analyse.py）都运行
+```
+```
+Document/                           # 文档
+├── sched/                          # 对内核中task_struct结构和调度子系统的解析
+├── sched_ext/                           
+      ├── sched_ext.md              # sched_ext整体架构和核心函数的解析
+      └── README.zh.md              # scx-nest的官方中文文档
+├── cpu.md                          # CPU 监控程序的思路和实验
+├── io.md                           # IO 监控程序的思路和实验
+├── memory.md                       # 内存监控程序的思路和实验
+├── net.md                          # 网络监控程序的思路和实验
+├── scx-nest.md                     # scx-nest的实验测试文档
+└── 环境搭建.md                      # 实验环境配置文档
 ```
 
 我在这里进一步强调一下，scx_spy.c是scx分支的目标文件，拥有包括sched_ext的完整功能，os_spy.c是main分支的目标文件，拥有整个系统监测的功能
@@ -172,7 +190,7 @@ tcpretrans记录系统中 TCP 重传的具体事件，精确定位是哪些任�
 具体的情况和实验请看[这里](Document/net.md)
 
 ## scx-nest调度器设计
-在讲基于sched_ext的调度器设计之前，需要先补充一下Linux调度器的大体架构，我对这里做过详细的分析，文档在这里
+在讲基于sched_ext的调度器设计之前，需要先补充一下Linux调度器的大体架构，我对这里做了详细的分析，文档在这里
 - [task_struct结构体分析](Document/sched/任务的内核态表示.md)
 - [Linux内核调度器介绍](Document/sched/调度.md)
 - [sched_ext架构介绍](Document/sched_ext/sched_ext.md)
