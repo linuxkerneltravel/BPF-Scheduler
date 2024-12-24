@@ -74,10 +74,10 @@ void handle_sigint(int sig) {
 /*----------------------网络部分----------------------------------*/
 // 和可视化有关的
 const char *net_csv_names[] = {
-        "net_latency",
-        "tcprtt",
-        "tcptop",
-        "tcpretrans"
+        "net_latency.csv",
+        "tcprtt.csv",
+        "tcptop.csv",
+        "tcpretrans.csv"
     };
 
 FILE *net_csv_files[MAX_CSV_FILES];
@@ -129,9 +129,9 @@ DiskStats current[MAX_DEVICES];
 
 // 和可视化有关的
 const char *io_csv_names[] = {
-        "io_task_stats",
-        "io_process_stats",
-        "iowait_perf",
+        "io_task_stats.csv",
+        "io_process_stats.csv",
+        "iowait_perf.csv",
     };
 
 FILE *io_csv_files[MAX_CSV_FILES];
@@ -156,9 +156,9 @@ FILE *mm_file = NULL;
 
 // 和可视化有关的
 const char *mm_csv_names[] = {
-        "oom_event",
-        "task_mm_stats",
-        "process_mm_stats",
+        "oom_event.csv",
+        "task_mm_stats.csv",
+        "process_mm_stats.csv",
     };
 
 const char mm_stack[] = "mm_alloc";
@@ -202,10 +202,10 @@ struct ring_buffer *rb_backtrace = NULL;
 struct cpu_stats_bpf *cpu_skel = NULL;
 
 const char *cpu_csv_names[] = {
-        "cpu_usage",
-        "task_usage",
-        "process_stat",
-        "runqlat",
+        "cpu_usage.csv",
+        "task_usage.csv",
+        "process_stat.csv",
+        "runqlat.csv",
     };
 
 const char cpu_stack[] = "task_backtrace";
@@ -523,7 +523,7 @@ static int attach_net_skel(struct net_stats_bpf *skel){
 		return ret;
     }
 
-    link_to_tcprtt = attach_perf_event_to_program(skel->progs.handle_tcprtt_event,500);
+    link_to_tcprtt = attach_perf_event_to_program(skel->progs.handle_tcprtt_event,1000);
     if(!link_to_tcprtt){
         return -1;
     }
@@ -1443,7 +1443,7 @@ static int attach_io_skel(struct io_stats_bpf *skel){
 		return -1;
     }
 
-    link_io_wait = attach_perf_event_to_program(skel->progs.handle_io_wait_event,500);
+    link_io_wait = attach_perf_event_to_program(skel->progs.handle_io_wait_event,1000);
     if(!link_io_wait){
         return -1;
     }

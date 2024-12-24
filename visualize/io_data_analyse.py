@@ -186,6 +186,6 @@ def update_iowait(new_data, gateway):
     except Exception as e:
         print(f"Error while pushing to Prometheus: {e}")
 
-threading.Thread(target=monitor_and_push, args=("run/io_task.csv", update_io_task_stats ,0.5)).start()
-threading.Thread(target=monitor_and_push, args=("run/io_process.csv", update_io_process_stats,0.8)).start()
-threading.Thread(target=monitor_and_push, args=("run/iowait.csv",update_iowait , 1.0)).start()
+threading.Thread(target=monitor_and_push, args=("run/io_task_stats.csv", update_io_task_stats ,0.5)).start()
+threading.Thread(target=monitor_and_push, args=("run/io_process_stats.csv", update_io_process_stats,0.8)).start()
+threading.Thread(target=monitor_and_push, args=("run/iowait_perf.csv",update_iowait , 1.0)).start()

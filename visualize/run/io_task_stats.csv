@@ -1,0 +1,907 @@
+PID,Command,Read Count,Write Count
+5075,cpptools,450,0
+5270,cpptools-srv,450,0
+5273,cpptools-srv,0,450
+5229,cpptools,0,450
+5226,cpptools,0,450
+5227,cpptools,0,450
+5228,cpptools,0,450
+5271,cpptools-srv,0,450
+5272,cpptools-srv,0,450
+8188,cpptools-srv,450,0
+4993,code,264,400
+4981,Chrome_ChildIOT,0,100
+10776,os_spy,10,50
+4982,VizCompositorTh,50,0
+1652,prometheus-node,450,18
+1651,prometheus-node,450,0
+8120,prometheus-node,450,9
+1655,prometheus-node,450,9
+1653,prometheus-node,450,0
+1656,prometheus-node,450,0
+1649,prometheus-node,450,0
+818,prometheus-node,450,18
+10776,os_spy,36,150
+4993,code,216,400
+4838,code,250,115
+4981,Chrome_ChildIOT,0,150
+4846,Chrome_IOThread,90,150
+4982,VizCompositorTh,100,0
+10776,os_spy,24,150
+3780,gdbus,108,450
+3799,gdbus,180,450
+3826,gdbus,207,450
+3777,ibus-daemon,450,297
+3783,ibus-ui-gtk3,450,207
+10788,jspawnhelper,450,9
+10789,bash,450,0
+10776,os_spy,24,100
+7183,firefox,50,32
+7712,Isolated Web Co,200,108
+7724,IPC I/O Child,22,50
+10804,StreamT~ns #232,450,0
+10805,StreamT~ns #233,450,0
+7712,Isolated Web Co,350,217
+7183,firefox,400,232
+10776,os_spy,36,150
+7724,IPC I/O Child,17,50
+7712,Isolated Web Co,300,150
+7724,IPC I/O Child,6,100
+7183,firefox,100,64
+7712,Isolated Web Co,250,125
+10776,os_spy,36,150
+7183,firefox,300,270
+7724,IPC I/O Child,0,100
+7298,Cache2 I/O,450,171
+7280,IPC I/O Parent,0,350
+7426,Privileged Cont,300,132
+7440,IPC I/O Child,0,250
+7712,Isolated Web Co,400,216
+10776,os_spy,18,150
+7724,IPC I/O Child,4,200
+7364,Softwar~cThread,0,50
+7183,firefox,350,210
+3799,gdbus,162,450
+3780,gdbus,126,350
+7298,Cache2 I/O,400,192
+7280,IPC I/O Parent,0,400
+7712,Isolated Web Co,400,264
+7724,IPC I/O Child,36,100
+3780,gdbus,99,450
+1663,prometheus-node,450,0
+1654,prometheus-node,450,0
+1651,prometheus-node,450,0
+817,prometheus-node,450,0
+1653,prometheus-node,450,0
+818,prometheus-node,450,0
+8120,prometheus-node,450,0
+1652,prometheus-node,450,0
+7183,firefox,150,87
+7712,Isolated Web Co,350,203
+10776,os_spy,27,150
+7724,IPC I/O Child,0,100
+7712,Isolated Web Co,250,145
+3780,gdbus,135,450
+3799,gdbus,180,450
+7183,firefox,350,280
+10776,os_spy,66,300
+7712,Isolated Web Co,400,288
+10776,os_spy,77,350
+7724,IPC I/O Child,22,50
+7712,Isolated Web Co,400,320
+7724,IPC I/O Child,54,100
+10776,os_spy,88,400
+3780,gdbus,161,350
+7183,firefox,350,252
+7712,Isolated Web Co,350,231
+7724,IPC I/O Child,39,150
+10815,cron,450,0
+7712,Isolated Web Co,200,168
+10776,os_spy,12,50
+7183,firefox,50,32
+7712,Isolated Web Co,50,27
+4428,prometheus,450,9
+7183,firefox,250,150
+7712,Isolated Web Co,150,81
+10776,os_spy,12,50
+7724,IPC I/O Child,4,100
+7712,Isolated Web Co,400,208
+10818,StreamT~ns #126,450,0
+10819,StreamT~ns #126,450,0
+10776,os_spy,66,300
+7724,IPC I/O Child,0,100
+7712,Isolated Web Co,250,140
+7724,IPC I/O Child,5,50
+3780,gdbus,126,450
+7183,firefox,100,62
+7712,Isolated Web Co,350,252
+10817,StreamT~ns #180,450,0
+10776,os_spy,36,150
+10820,StreamT~ns #133,450,0
+7724,IPC I/O Child,34,50
+7712,Isolated Web Co,350,308
+3780,gdbus,144,450
+7183,firefox,450,225
+10776,os_spy,12,50
+7298,Cache2 I/O,450,9
+7724,IPC I/O Child,32,100
+7712,Isolated Web Co,400,288
+10776,os_spy,6,50
+7183,firefox,250,180
+7298,Cache2 I/O,450,45
+7712,Isolated Web Co,350,273
+10776,os_spy,12,50
+7183,firefox,450,324
+10821,StreamT~ns #126,450,0
+7712,Isolated Web Co,300,192
+7298,Cache2 I/O,450,45
+1663,prometheus-node,450,0
+818,prometheus-node,450,9
+727,prometheus-node,450,0
+1657,prometheus-node,450,0
+1656,prometheus-node,450,0
+1654,prometheus-node,450,9
+817,prometheus-node,450,0
+1652,prometheus-node,450,0
+1655,prometheus-node,450,9
+1651,prometheus-node,450,279
+10824,StreamT~ns #132,450,0
+10776,os_spy,24,150
+7183,firefox,150,108
+7712,Isolated Web Co,200,128
+7298,Cache2 I/O,450,36
+7712,Isolated Web Co,150,102
+10776,os_spy,36,150
+7712,Isolated Web Co,250,150
+7712,Isolated Web Co,350,175
+7183,firefox,450,279
+7298,Cache2 I/O,450,72
+10776,os_spy,12,50
+7712,Isolated Web Co,350,301
+10776,os_spy,44,200
+7183,firefox,450,306
+10776,os_spy,12,50
+7298,Cache2 I/O,450,9
+1657,prometheus-node,450,9
+1649,prometheus-node,450,0
+1651,prometheus-node,450,0
+1655,prometheus-node,450,0
+1653,prometheus-node,450,0
+1652,prometheus-node,450,0
+727,prometheus-node,450,9
+10776,os_spy,36,150
+817,prometheus-node,450,9
+1650,prometheus-node,450,0
+1652,prometheus-node,450,0
+1654,prometheus-node,450,0
+1651,prometheus-node,450,0
+1649,prometheus-node,450,18
+727,prometheus-node,450,0
+1655,prometheus-node,423,450
+10776,os_spy,18,150
+1663,prometheus-node,450,18
+1657,prometheus-node,450,0
+1654,prometheus-node,450,0
+727,prometheus-node,450,0
+1649,prometheus-node,450,18
+817,prometheus-node,252,450
+10776,os_spy,27,150
+10836,StreamT~ns #235,450,0
+10837,StreamT~ns #236,450,0
+10776,os_spy,12,50
+4426,prometheus,150,6
+10842,StreamT~ns #127,450,0
+10843,StreamT~ns #127,450,0
+10776,os_spy,11,50
+10841,StreamT~ns #184,450,0
+10776,os_spy,24,100
+10844,StreamT~ns #134,450,0
+10776,os_spy,88,400
+10845,StreamT~ns #127,450,0
+10776,os_spy,36,150
+1656,prometheus-node,450,9
+1653,prometheus-node,450,27
+1652,prometheus-node,450,9
+1663,prometheus-node,450,0
+1650,prometheus-node,450,0
+727,prometheus-node,450,18
+1654,prometheus-node,450,171
+817,prometheus-node,450,27
+1655,prometheus-node,450,54
+10846,StreamT~ns #133,450,0
+10776,os_spy,36,150
+7183,firefox,400,296
+7298,Cache2 I/O,450,9
+7712,Isolated Web Co,200,120
+7724,IPC I/O Child,3,50
+7183,firefox,450,369
+7712,Isolated Web Co,300,156
+10776,os_spy,12,50
+7298,Cache2 I/O,450,45
+7724,IPC I/O Child,4,100
+7280,IPC I/O Parent,0,50
+7712,Isolated Web Co,350,203
+10776,os_spy,66,300
+7183,firefox,450,288
+7724,IPC I/O Child,3,50
+10776,os_spy,66,300
+7712,Isolated Web Co,250,140
+7724,IPC I/O Child,3,50
+7712,Isolated Web Co,400,224
+10776,os_spy,88,400
+7724,IPC I/O Child,0,100
+7712,Isolated Web Co,400,224
+7183,firefox,50,34
+3780,gdbus,135,450
+10776,os_spy,36,150
+7724,IPC I/O Child,40,100
+1652,prometheus-node,450,9
+1663,prometheus-node,450,0
+727,prometheus-node,450,9
+1654,prometheus-node,450,0
+817,prometheus-node,450,0
+818,prometheus-node,450,9
+1649,prometheus-node,450,0
+8120,prometheus-node,450,36
+1656,prometheus-node,315,450
+7712,Isolated Web Co,250,175
+10776,os_spy,36,150
+7724,IPC I/O Child,50,100
+7712,Isolated Web Co,300,198
+7183,firefox,400,280
+3780,gdbus,154,350
+7712,Isolated Web Co,350,315
+10776,os_spy,36,150
+7724,IPC I/O Child,33,150
+7712,Isolated Web Co,400,304
+7183,firefox,150,81
+7712,Isolated Web Co,400,280
+10776,os_spy,66,300
+7724,IPC I/O Child,13,50
+7183,firefox,250,130
+10776,os_spy,66,300
+7712,Isolated Web Co,350,259
+7712,Isolated Web Co,250,215
+10776,os_spy,33,150
+10776,os_spy,77,350
+7712,Isolated Web Co,50,37
+7712,Isolated Web Co,350,287
+10776,os_spy,77,350
+7183,firefox,300,198
+7724,IPC I/O Child,34,50
+10776,os_spy,99,450
+7712,Isolated Web Co,400,288
+7724,IPC I/O Child,112,200
+3780,gdbus,108,450
+3799,gdbus,162,450
+7183,firefox,100,54
+7298,Cache2 I/O,450,45
+7712,Isolated Web Co,350,266
+7724,IPC I/O Child,112,200
+10776,os_spy,36,150
+7183,firefox,200,152
+7712,Isolated Web Co,350,308
+7724,IPC I/O Child,36,50
+10776,os_spy,36,150
+3780,gdbus,117,450
+7183,firefox,50,34
+7712,Isolated Web Co,250,205
+7724,IPC I/O Child,31,50
+7712,Isolated Web Co,250,185
+3780,gdbus,112,400
+10776,os_spy,36,150
+7724,IPC I/O Child,24,50
+7183,firefox,200,116
+7712,Isolated Web Co,150,102
+10776,os_spy,10,50
+8120,prometheus-node,450,0
+1663,prometheus-node,450,0
+727,prometheus-node,450,0
+817,prometheus-node,450,18
+1651,prometheus-node,450,0
+1653,prometheus-node,81,450
+3780,gdbus,117,450
+7183,firefox,100,74
+7712,Isolated Web Co,250,155
+7724,IPC I/O Child,50,100
+10776,os_spy,27,150
+3777,ibus-daemon,100,40
+3799,gdbus,32,100
+7712,Isolated Web Co,400,320
+7183,firefox,250,165
+7724,IPC I/O Child,78,150
+10776,os_spy,27,150
+3780,gdbus,108,450
+4993,code,252,450
+7712,Isolated Web Co,400,328
+7724,IPC I/O Child,54,100
+10776,os_spy,18,150
+3799,gdbus,207,450
+3806,gdbus,189,450
+3826,gdbus,198,450
+3780,gdbus,135,450
+3777,ibus-daemon,450,216
+3783,ibus-ui-gtk3,450,216
+10776,os_spy,18,150
+10776,os_spy,24,100
+8120,prometheus-node,450,9
+1649,prometheus-node,450,0
+1663,prometheus-node,450,0
+1652,prometheus-node,450,9
+1653,prometheus-node,450,0
+1656,prometheus-node,450,18
+1657,prometheus-node,450,0
+1655,prometheus-node,450,9
+10776,os_spy,36,150
+10836,StreamT~ns #235,450,0
+10865,StreamT~ns #237,450,0
+3780,gdbus,126,450
+3799,gdbus,180,450
+4993,code,252,450
+4838,code,250,100
+4981,Chrome_ChildIOT,0,200
+4846,Chrome_IOThread,128,200
+10776,os_spy,66,300
+4982,VizCompositorTh,100,0
+3780,gdbus,144,450
+3799,gdbus,144,450
+3826,gdbus,207,450
+3777,ibus-daemon,450,207
+10776,os_spy,66,300
+7183,firefox,400,248
+7712,Isolated Web Co,200,100
+10776,os_spy,60,300
+7183,firefox,250,170
+7712,Isolated Web Co,300,216
+7724,IPC I/O Child,42,150
+10776,os_spy,60,300
+7712,Isolated Web Co,300,234
+7183,firefox,150,108
+3780,gdbus,147,350
+7724,IPC I/O Child,72,150
+10776,os_spy,88,400
+7712,Isolated Web Co,350,301
+7183,firefox,250,195
+7724,IPC I/O Child,104,200
+4431,prometheus,450,9
+7712,Isolated Web Co,150,96
+7183,firefox,50,31
+7712,Isolated Web Co,400,296
+7724,IPC I/O Child,120,250
+10883,StreamT~ns #128,450,0
+10884,StreamT~ns #128,450,0
+10776,os_spy,10,50
+7712,Isolated Web Co,400,304
+7724,IPC I/O Child,125,250
+3780,gdbus,126,450
+7183,firefox,200,124
+10776,os_spy,12,50
+7712,Isolated Web Co,200,156
+10847,StreamT~ns #185,450,0
+10885,StreamT~ns #135,450,0
+10776,os_spy,36,150
+7183,firefox,350,273
+7712,Isolated Web Co,50,31
+7712,Isolated Web Co,300,222
+10776,os_spy,12,50
+7724,IPC I/O Child,31,50
+7712,Isolated Web Co,300,222
+10776,os_spy,7,50
+10886,StreamT~ns #128,450,0
+7724,IPC I/O Child,30,50
+7712,Isolated Web Co,300,180
+10776,os_spy,27,150
+1653,prometheus-node,450,9
+1654,prometheus-node,450,0
+1652,prometheus-node,450,0
+818,prometheus-node,450,27
+1657,prometheus-node,450,0
+817,prometheus-node,450,9
+8120,prometheus-node,450,9
+1650,prometheus-node,432,450
+10887,StreamT~ns #134,450,0
+10776,os_spy,30,150
+7183,firefox,50,32
+7712,Isolated Web Co,50,28
+7712,Isolated Web Co,150,90
+7712,Isolated Web Co,100,66
+10776,os_spy,12,50
+7712,Isolated Web Co,250,190
+10776,os_spy,88,400
+7712,Isolated Web Co,250,205
+7712,Isolated Web Co,350,252
+7724,IPC I/O Child,29,50
+10776,os_spy,36,150
+7712,Isolated Web Co,200,160
+3780,gdbus,90,450
+3799,gdbus,180,450
+7183,firefox,350,203
+10776,os_spy,12,50
+4993,code,234,450
+4838,code,250,105
+4981,Chrome_ChildIOT,0,250
+4846,Chrome_IOThread,128,200
+4982,VizCompositorTh,100,0
+10776,os_spy,36,150
+3799,gdbus,135,450
+3780,gdbus,135,450
+3806,gdbus,216,450
+3826,gdbus,216,450
+3777,ibus-daemon,450,252
+3783,ibus-ui-gtk3,450,270
+10776,os_spy,36,150
+818,prometheus-node,450,0
+1653,prometheus-node,450,0
+1654,prometheus-node,450,0
+1649,prometheus-node,450,0
+727,prometheus-node,450,0
+1652,prometheus-node,450,207
+10776,os_spy,36,150
+4981,Chrome_ChildIOT,0,100
+4982,VizCompositorTh,50,0
+10776,os_spy,12,50
+4981,Chrome_ChildIOT,0,50
+4838,code,100,22
+10776,os_spy,12,50
+4981,Chrome_ChildIOT,0,50
+10776,os_spy,36,150
+3799,gdbus,162,450
+3780,gdbus,135,450
+4993,code,135,450
+4931,Chrome_ChildIOT,400,0
+4981,Chrome_ChildIOT,0,150
+5075,cpptools,450,0
+8188,cpptools-srv,450,0
+4838,code,50,3
+4846,Chrome_IOThread,20,50
+10776,os_spy,24,100
+4981,Chrome_ChildIOT,0,50
+3780,gdbus,162,450
+3799,gdbus,135,450
+3826,gdbus,198,450
+3806,gdbus,216,450
+3783,ibus-ui-gtk3,450,270
+4993,code,29,50
+4993,code,108,300
+4838,code,100,18
+4981,Chrome_ChildIOT,0,50
+10776,os_spy,36,150
+4981,Chrome_ChildIOT,0,50
+4982,VizCompositorTh,50,0
+10776,os_spy,12,50
+3780,gdbus,108,450
+3799,gdbus,126,450
+4993,code,135,450
+5075,cpptools,450,0
+8188,cpptools-srv,450,0
+4838,code,300,18
+4846,Chrome_IOThread,85,250
+10776,os_spy,18,150
+4981,Chrome_ChildIOT,0,50
+4982,VizCompositorTh,50,0
+1656,prometheus-node,450,0
+1654,prometheus-node,450,9
+1649,prometheus-node,450,0
+1653,prometheus-node,450,0
+817,prometheus-node,450,0
+1650,prometheus-node,450,27
+1652,prometheus-node,450,0
+1651,prometheus-node,450,18
+727,prometheus-node,450,0
+1657,prometheus-node,450,108
+10776,os_spy,45,450
+3780,gdbus,144,450
+3799,gdbus,153,450
+3806,gdbus,252,450
+3826,gdbus,207,450
+3777,ibus-daemon,450,225
+3783,ibus-ui-gtk3,450,216
+10776,os_spy,54,450
+3780,gdbus,153,450
+3799,gdbus,189,450
+3799,gdbus,198,450
+3780,gdbus,135,450
+3799,gdbus,135,450
+10776,os_spy,12,50
+3780,gdbus,153,450
+3806,gdbus,198,450
+3826,gdbus,207,450
+7712,Isolated Web Co,50,29
+7183,firefox,50,30
+7712,Isolated Web Co,300,186
+10776,os_spy,12,50
+7724,IPC I/O Child,14,100
+7712,Isolated Web Co,350,210
+10776,os_spy,66,300
+7724,IPC I/O Child,0,100
+7712,Isolated Web Co,100,54
+10776,os_spy,55,250
+3780,gdbus,144,450
+7183,firefox,350,280
+7298,Cache2 I/O,450,9
+7712,Isolated Web Co,400,304
+10776,os_spy,77,350
+3799,gdbus,17,50
+7724,IPC I/O Child,25,50
+7183,firefox,250,160
+3780,gdbus,153,450
+7298,Cache2 I/O,450,9
+7712,Isolated Web Co,350,266
+7724,IPC I/O Child,130,250
+7712,Isolated Web Co,400,320
+10776,os_spy,36,150
+7724,IPC I/O Child,130,250
+7712,Isolated Web Co,50,35
+3780,gdbus,161,350
+7712,Isolated Web Co,350,322
+7183,firefox,250,170
+7724,IPC I/O Child,34,50
+10776,os_spy,24,100
+1657,prometheus-node,450,18
+817,prometheus-node,450,45
+1663,prometheus-node,450,0
+727,prometheus-node,450,9
+1654,prometheus-node,450,0
+1650,prometheus-node,450,0
+1651,prometheus-node,450,117
+10921,StreamT~ns #238,450,0
+7712,Isolated Web Co,200,132
+10923,StreamT~ns #239,450,0
+10776,os_spy,30,300
+7712,Isolated Web Co,250,165
+7183,firefox,200,108
+10776,os_spy,66,300
+7712,Isolated Web Co,250,145
+7712,Isolated Web Co,50,28
+7712,Isolated Web Co,50,29
+10776,os_spy,12,50
+7712,Isolated Web Co,50,30
+7183,firefox,100,56
+7712,Isolated Web Co,300,216
+10776,os_spy,12,50
+7724,IPC I/O Child,96,200
+4426,prometheus,400,24
+7712,Isolated Web Co,350,294
+10776,os_spy,66,300
+7724,IPC I/O Child,140,250
+3780,gdbus,126,450
+7183,firefox,450,315
+7298,Cache2 I/O,450,9
+10927,StreamT~ns #129,450,0
+10928,StreamT~ns #129,450,0
+7712,Isolated Web Co,250,175
+10776,os_spy,66,300
+7712,Isolated Web Co,350,252
+7183,firefox,50,35
+7298,Cache2 I/O,450,36
+10776,os_spy,66,300
+7183,firefox,450,342
+7724,IPC I/O Child,37,50
+10929,StreamT~ns #187,400,16
+7712,Isolated Web Co,350,294
+7298,Cache2 I/O,450,45
+10776,os_spy,12,50
+7183,firefox,300,228
+7712,Isolated Web Co,300,192
+7298,Cache2 I/O,0,450
+10930,StreamT~ns #136,450,9
+7724,IPC I/O Child,114,150
+7712,Isolated Web Co,350,287
+3780,gdbus,81,450
+10776,os_spy,66,300
+7183,firefox,300,246
+7724,IPC I/O Child,78,150
+10776,os_spy,66,300
+10931,StreamT~ns #129,450,0
+7712,Isolated Web Co,200,128
+7183,firefox,150,78
+7724,IPC I/O Child,100,200
+7712,Isolated Web Co,250,150
+727,prometheus-node,450,9
+1663,prometheus-node,450,9
+8120,prometheus-node,450,0
+1650,prometheus-node,450,0
+817,prometheus-node,450,18
+1651,prometheus-node,450,0
+10932,StreamT~ns #135,450,0
+7183,firefox,100,62
+10776,os_spy,36,150
+3780,gdbus,126,350
+7712,Isolated Web Co,350,287
+7724,IPC I/O Child,29,50
+10776,os_spy,30,150
+7183,firefox,50,32
+7712,Isolated Web Co,150,69
+7183,firefox,250,165
+7712,Isolated Web Co,250,150
+7183,firefox,200,124
+7724,IPC I/O Child,48,100
+10776,os_spy,24,100
+7712,Isolated Web Co,300,186
+7724,IPC I/O Child,50,100
+3780,gdbus,117,450
+7183,firefox,150,87
+7298,Cache2 I/O,450,45
+7712,Isolated Web Co,400,336
+10776,os_spy,6,50
+7183,firefox,250,195
+7724,IPC I/O Child,41,50
+7298,Cache2 I/O,450,45
+7712,Isolated Web Co,350,252
+10776,os_spy,66,300
+7183,firefox,400,320
+7280,IPC I/O Parent,0,50
+7724,IPC I/O Child,80,100
+7712,Isolated Web Co,350,308
+10776,os_spy,36,150
+7712,Isolated Web Co,350,322
+7183,firefox,450,324
+7298,Cache2 I/O,450,45
+7724,IPC I/O Child,117,150
+10776,os_spy,36,150
+7712,Isolated Web Co,300,228
+7183,firefox,400,256
+7298,Cache2 I/O,450,81
+7724,IPC I/O Child,72,100
+10776,os_spy,12,50
+7712,Isolated Web Co,150,105
+7712,Isolated Web Co,300,204
+10776,os_spy,27,150
+7183,firefox,200,104
+7712,Isolated Web Co,400,264
+7724,IPC I/O Child,25,50
+10776,os_spy,6,50
+7712,Isolated Web Co,250,105
+10776,os_spy,12,50
+7712,Isolated Web Co,150,102
+7712,Isolated Web Co,350,308
+8120,prometheus-node,450,0
+1654,prometheus-node,450,27
+817,prometheus-node,450,0
+1653,prometheus-node,450,9
+1652,prometheus-node,450,0
+727,prometheus-node,450,0
+818,prometheus-node,450,0
+7724,IPC I/O Child,120,150
+7183,firefox,150,87
+10776,os_spy,18,150
+3780,gdbus,108,450
+7183,firefox,350,238
+7712,Isolated Web Co,250,180
+7724,IPC I/O Child,30,50
+10776,os_spy,6,50
+7724,IPC I/O Child,20,50
+7712,Isolated Web Co,200,128
+7183,firefox,200,104
+7724,IPC I/O Child,85,250
+7712,Isolated Web Co,400,216
+10776,os_spy,6,50
+7183,firefox,200,104
+10776,os_spy,12,50
+7724,IPC I/O Child,12,200
+7712,Isolated Web Co,350,154
+10776,os_spy,12,50
+7712,Isolated Web Co,50,33
+7183,firefox,250,175
+3780,gdbus,161,350
+7712,Isolated Web Co,350,301
+7724,IPC I/O Child,102,150
+10776,os_spy,24,100
+7712,Isolated Web Co,100,56
+7183,firefox,50,27
+7183,firefox,400,224
+7712,Isolated Web Co,400,256
+10776,os_spy,30,150
+7712,Isolated Web Co,150,120
+7712,Isolated Web Co,350,294
+10776,os_spy,18,150
+7183,firefox,50,32
+7712,Isolated Web Co,400,288
+7724,IPC I/O Child,120,250
+3780,gdbus,9,50
+7183,firefox,200,108
+10776,os_spy,27,150
+7298,Cache2 I/O,450,45
+7712,Isolated Web Co,400,304
+7724,IPC I/O Child,130,250
+10776,os_spy,18,150
+7712,Isolated Web Co,350,308
+3780,gdbus,99,450
+7183,firefox,50,37
+7724,IPC I/O Child,64,100
+10776,os_spy,6,50
+727,prometheus-node,450,9
+1657,prometheus-node,450,0
+1653,prometheus-node,450,9
+1651,prometheus-node,450,0
+1656,prometheus-node,450,9
+8120,prometheus-node,450,0
+7712,Isolated Web Co,250,190
+7724,IPC I/O Child,22,50
+10776,os_spy,36,150
+7183,firefox,400,208
+7712,Isolated Web Co,50,33
+10776,os_spy,12,50
+7183,firefox,400,272
+3780,gdbus,161,350
+7712,Isolated Web Co,350,315
+7724,IPC I/O Child,105,150
+10776,os_spy,6,50
+7712,Isolated Web Co,250,175
+7183,firefox,150,81
+10776,os_spy,11,50
+7712,Isolated Web Co,150,87
+7183,firefox,50,33
+10776,os_spy,11,50
+7712,Isolated Web Co,400,288
+7724,IPC I/O Child,135,250
+3780,gdbus,22,100
+7183,firefox,250,165
+7298,Cache2 I/O,450,54
+10776,os_spy,6,50
+7712,Isolated Web Co,400,264
+7724,IPC I/O Child,130,250
+3780,gdbus,99,450
+7183,firefox,150,117
+10776,os_spy,12,50
+7712,Isolated Web Co,400,296
+7724,IPC I/O Child,23,50
+10776,os_spy,88,400
+7712,Isolated Web Co,400,288
+7183,firefox,50,30
+3780,gdbus,133,350
+7724,IPC I/O Child,145,250
+7183,firefox,150,102
+7712,Isolated Web Co,400,304
+7724,IPC I/O Child,44,100
+10776,os_spy,12,50
+7183,firefox,200,104
+7712,Isolated Web Co,100,60
+10776,os_spy,12,50
+7183,firefox,300,192
+7712,Isolated Web Co,400,264
+7724,IPC I/O Child,66,150
+10776,os_spy,12,100
+7712,Isolated Web Co,400,312
+3780,gdbus,144,450
+7183,firefox,150,87
+7298,Cache2 I/O,450,54
+7724,IPC I/O Child,135,250
+10776,os_spy,6,50
+7712,Isolated Web Co,300,216
+7724,IPC I/O Child,105,150
+10776,os_spy,88,400
+7712,Isolated Web Co,350,266
+7724,IPC I/O Child,36,50
+7183,firefox,50,33
+7298,Cache2 I/O,450,36
+818,prometheus-node,450,0
+1654,prometheus-node,450,0
+1655,prometheus-node,450,18
+1656,prometheus-node,450,0
+8120,prometheus-node,450,36
+1651,prometheus-node,450,0
+1663,prometheus-node,450,9
+7712,Isolated Web Co,350,287
+7183,firefox,300,252
+10776,os_spy,36,150
+10921,StreamT~ns #238,450,0
+10938,StreamT~ns #240,450,0
+7712,Isolated Web Co,350,315
+7724,IPC I/O Child,145,250
+10776,os_spy,12,50
+7712,Isolated Web Co,200,144
+7712,Isolated Web Co,200,132
+10776,os_spy,36,150
+7712,Isolated Web Co,200,128
+7712,Isolated Web Co,200,124
+10776,os_spy,10,50
+7183,firefox,50,29
+7712,Isolated Web Co,350,196
+10776,os_spy,21,150
+4437,prometheus,450,9
+7712,Isolated Web Co,300,204
+7183,firefox,100,66
+7712,Isolated Web Co,300,198
+10776,os_spy,18,150
+10939,StreamT~ns #130,450,0
+10940,StreamT~ns #130,450,0
+10776,os_spy,30,150
+7183,firefox,400,256
+7298,Cache2 I/O,450,9
+7712,Isolated Web Co,100,56
+7712,Isolated Web Co,350,238
+7724,IPC I/O Child,34,50
+10922,StreamT~ns #186,50,3
+10776,os_spy,6,50
+7724,IPC I/O Child,128,200
+7712,Isolated Web Co,350,266
+10776,os_spy,88,400
+7183,firefox,300,216
+7298,Cache2 I/O,450,36
+7712,Isolated Web Co,350,301
+7724,IPC I/O Child,86,100
+3780,gdbus,19,50
+7183,firefox,400,304
+7724,IPC I/O Child,135,250
+7712,Isolated Web Co,400,320
+3780,gdbus,99,450
+3799,gdbus,18,50
+10776,os_spy,12,50
+7183,firefox,400,264
+10943,StreamT~ns #137,450,9
+7298,Cache2 I/O,450,9
+10944,StreamT~ns #130,450,0
+7712,Isolated Web Co,350,217
+10776,os_spy,36,150
+818,prometheus-node,450,0
+1663,prometheus-node,450,9
+1652,prometheus-node,450,0
+1653,prometheus-node,450,0
+1649,prometheus-node,450,9
+1650,prometheus-node,450,27
+1651,prometheus-node,396,450
+10945,StreamT~ns #136,450,0
+7712,Isolated Web Co,350,203
+7183,firefox,200,132
+7298,Cache2 I/O,450,72
+7724,IPC I/O Child,7,50
+10776,os_spy,36,150
+4178,x-terminal-emul,50,29
+7712,Isolated Web Co,300,180
+10776,os_spy,10,50
+7712,Isolated Web Co,300,180
+10776,os_spy,11,50
+7712,Isolated Web Co,250,150
+7183,firefox,150,105
+7298,Cache2 I/O,450,45
+7712,Isolated Web Co,150,66
+10776,os_spy,12,50
+7712,Isolated Web Co,350,245
+7724,IPC I/O Child,52,100
+10776,os_spy,66,300
+7712,Isolated Web Co,350,280
+3780,gdbus,120,400
+7183,firefox,400,272
+7280,IPC I/O Parent,0,50
+7724,IPC I/O Child,84,150
+10776,os_spy,40,400
+7712,Isolated Web Co,350,217
+7724,IPC I/O Child,20,100
+10776,os_spy,88,400
+7712,Isolated Web Co,350,217
+7724,IPC I/O Child,14,100
+10776,os_spy,88,400
+7712,Isolated Web Co,350,280
+7724,IPC I/O Child,78,150
+10776,os_spy,88,400
+7183,firefox,150,84
+7712,Isolated Web Co,400,256
+7724,IPC I/O Child,138,300
+10776,os_spy,88,400
+7183,firefox,150,78
+7712,Isolated Web Co,250,140
+10776,os_spy,72,400
+7183,firefox,50,29
+7712,Isolated Web Co,100,54
+10776,os_spy,77,350
+7183,firefox,50,28
+7712,Isolated Web Co,200,128
+10776,os_spy,36,150
+7712,Isolated Web Co,300,174
+818,prometheus-node,450,9
+1655,prometheus-node,450,9
+1653,prometheus-node,450,0
+1663,prometheus-node,450,9
+1650,prometheus-node,450,0
+1656,prometheus-node,450,0
+1651,prometheus-node,450,18
+1649,prometheus-node,153,450
+7712,Isolated Web Co,350,301
+10776,os_spy,36,150
+3799,gdbus,153,450
+3780,gdbus,126,450
+7183,firefox,150,108
+10776,os_spy,11,50
+7712,Isolated Web Co,100,58
+10776,os_spy,36,150
