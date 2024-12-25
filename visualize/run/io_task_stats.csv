@@ -1,0 +1,46 @@
+PID,Command,Read Count,Write Count
+12432,scx_spy,450,0
+10504,cpptools,450,0
+10627,cpptools-srv,450,0
+10422,code,174,300
+2114,gnome-shell,105,250
+2181,KMS thread,198,300
+10633,cpptools,0,100
+10636,cpptools,0,100
+10635,cpptools,0,100
+10634,cpptools,0,100
+10631,cpptools-srv,0,50
+7050,Chrome_ChildIOT,50,0
+12432,scx_spy,0,450
+2114,gnome-shell,156,300
+10422,code,135,250
+2181,KMS thread,160,250
+2114,gnome-shell,208,400
+2181,KMS thread,264,400
+12432,scx_spy,450,0
+3721,sudo,50,27
+3046,terminator,50,31
+3046,terminator,450,261
+3721,sudo,450,234
+12432,scx_spy,450,0
+2114,gnome-shell,78,150
+2181,KMS thread,128,200
+12432,scx_spy,0,200
+3046,terminator,450,270
+3721,sudo,450,225
+12432,scx_spy,45,450
+2114,gnome-shell,50,100
+12432,scx_spy,0,450
+3721,sudo,200,108
+3046,terminator,200,128
+12432,scx_spy,0,200
+3721,sudo,200,104
+3046,terminator,200,120
+12432,scx_spy,0,450
+12432,scx_spy,0,450
+3046,terminator,450,270
+3721,sudo,150,75
+12432,scx_spy,0,450
+12432,scx_spy,0,450
+3721,sudo,450,225
+3046,terminator,450,270

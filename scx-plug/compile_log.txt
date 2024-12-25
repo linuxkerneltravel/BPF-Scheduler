@@ -1,0 +1,49 @@
+  MKDIR    .output
+  CC       .output/io_stats.bpf.o
+  MKDIR    bpftool
+  BPFTOOL  bpftool/bootstrap/bpftool
+...                        libbfd: [ [31mOFF[m ]
+...               clang-bpf-co-re: [ [32mon[m  ]
+...                          llvm: [ [32mon[m  ]
+...                        libcap: [ [31mOFF[m ]
+  MKDIR    /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/include/bpf
+  INSTALL  /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/include/bpf/hashmap.h
+  INSTALL  /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/include/bpf/relo_core.h
+  INSTALL  /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/include/bpf/libbpf_internal.h
+  MKDIR    /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/
+  MKDIR    /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/
+  MKDIR    /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/bpf.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/btf.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/libbpf.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/libbpf_errno.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/netlink.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/nlattr.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/str_error.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/libbpf_probes.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/bpf_prog_linfo.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/btf_dump.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/hashmap.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/ringbuf.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/strset.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/linker.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/gen_loader.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/relo_core.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/usdt.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/zip.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/elf.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/features.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/btf_iter.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/staticobjs/btf_relocate.o
+  AR       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/libbpf/libbpf.a
+  INSTALL  bpf.h libbpf.h btf.h libbpf_common.h libbpf_legacy.h bpf_helpers.h bpf_helper_defs.h bpf_tracing.h bpf_endian.h bpf_core_read.h skel_internal.h libbpf_version.h usdt.bpf.h
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/main.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/common.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/json_writer.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/gen.o
+  CC       /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/btf.o
+  LINK     /home/ne0/sys_competition/start/cpu_watcher/.output/bpftool/bootstrap/bpftool
+  GEN-SKEL io_stats
+libbpf: elf: io_stats_bpf is not a valid eBPF object file
+Error: failed to open BPF object file: BPF object format invalid
+make: *** [Makefile:312：io_stats] 错误 95

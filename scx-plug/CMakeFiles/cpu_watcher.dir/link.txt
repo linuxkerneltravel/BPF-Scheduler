@@ -1,0 +1,1 @@
+/usr/bin/cc -g -Wall CMakeFiles/cpu_watcher.dir/sys_spy.c.o -o cpu_watcher  -lelf -lz -lstdc++ ../blazesym/target/release/libblazesym.a 

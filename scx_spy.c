@@ -276,6 +276,7 @@ struct ring_buffer *rb_task = NULL;
 struct ring_buffer *rb_process = NULL;
 struct ring_buffer *rb_runqlat = NULL;
 struct ring_buffer *rb_backtrace = NULL;
+struct ring_buffer *rb_runqlat_without_bad = NULL;
 struct cpu_stats_bpf *cpu_skel = NULL;
 
 const char *cpu_csv_names[] = {
@@ -283,6 +284,7 @@ const char *cpu_csv_names[] = {
         "task_usage.csv",
         "process_stat.csv",
         "runqlat.csv",
+        "runqlat_without_bad.csv",
     };
 
 const char cpu_stack[] = "task_backtrace";
@@ -304,6 +306,7 @@ static int handle_cpu_usage_event(void *ctx,void *data, size_t data_sz);
 static int handle_usr_task_usage_event(void *ctx,void *data, size_t data_sz);
 static int handle_use_process_stat_event(void *ctx,void *data, size_t data_sz);
 static int handle_usr_runqlat_event(void *ctx,void *data, size_t data_sz);
+static int handle_usr_runqlat_without_bad_event(void *ctx,void *data, size_t data_sz);
 
 static int attach_cpu_skel();
 static int cpu_ring_buffer_poll();
@@ -3044,6 +3047,78 @@ static int handle_usr_runqlat_event(void *ctx,void *data, size_t data_sz){
     return 0;
 }
 
+static int handle_usr_runqlat_without_bad_event(void *ctx,void *data, size_t data_sz){
+    struct runqlat_perf_data *late = data;
+    for(int i=0;i<MAX_LATENCY_BUCKETS;i++){
+        switch (i)
+        {
+        case 0:
+            printf("wait less than 1us: %u\n",late->data[i]);
+            break;
+        case 1:
+            printf("wait less than 4us: %u\n",late->data[i]);
+            break;
+        case 2:
+            printf("wait less than 16us: %u\n",late->data[i]);
+            break;
+        case 3:
+            printf("wait less than 64us: %u\n",late->data[i]);
+            break;
+        case 4:
+            printf("wait less than 256us: %u\n",late->data[i]);
+            break;
+        case 5:
+            printf("wait less than 1ms: %u\n",late->data[i]);
+            break;
+        case 6:
+            printf("wait less than 4ms: %u\n",late->data[i]);
+            break;
+        case 7:
+            printf("wait large than 4ms: %u\n",late->data[i]);
+            break;
+        default:
+            break;
+        }
+    }
+    
+    // 如果不需要可视化，直接返回
+    if (!env_data.visualize)
+        return 0;
+
+    // 检查 CSV 文件是否初始化
+    if (cpu_csv_files[4] == NULL) {
+        fprintf(stderr, "Error: CSV file not initialized for IO wait perf stats\n");
+        return -1;
+    }
+
+    // 检查文件是否为空
+    struct stat st;
+    if (fstat(fileno(cpu_csv_files[4]), &st) == -1) {
+        perror("Error checking file size");
+        return -1;
+    }
+
+    if (st.st_size == 0) {
+        // 文件为空，写入列名
+        fprintf(cpu_csv_files[4], "1us,4us,16us,64us,256us,1ms,4ms,4ms+\n");
+        fflush(cpu_csv_files[4]); // 确保数据立即写入文件
+    }
+
+    // 写入数据到 CSV 文件
+    fprintf(cpu_csv_files[4], "%u,%u,%u,%u,%u,%u,%u,%u\n",
+            late->data[0], 
+            late->data[1], 
+            late->data[2], 
+            late->data[3], 
+            late->data[4], 
+            late->data[5], 
+            late->data[6], 
+            late->data[7]);
+    
+
+    return 0;
+}
+
 static int attach_cpu_skel(){
     int err;
 
@@ -3125,6 +3200,12 @@ static int attach_cpu_skel(){
     }
     cpu_skel->links.handle_sys_latency_event = link_runqlat;
 
+    struct bpf_link *link_runqlat_without_bad = attach_perf_event_to_program(cpu_skel->progs.handle_sys_latency_without_bad_event,1000);
+    if(!link_runqlat_without_bad){
+        return err;
+    }
+    cpu_skel->links.handle_sys_latency_without_bad_event = link_runqlat_without_bad;
+
     // struct bpf_link *link_backtrace = attach_perf_event_to_program(skel->progs.handle_task_backtrace_event,500);
     // if(!link_backtrace){
     //     return err;
@@ -3151,6 +3232,12 @@ static int attach_cpu_skel(){
     rb_runqlat = ring_buffer__new(bpf_map__fd(cpu_skel->maps.runqlat_buffer), handle_usr_runqlat_event, NULL, NULL);
     if(!rb_runqlat){
         fprintf(stderr, "Failed to create ring buffer for runqlat\n");
+        return err;
+    }
+
+    rb_runqlat_without_bad = ring_buffer__new(bpf_map__fd(cpu_skel->maps.runqlat_without_bad_buffer), handle_usr_runqlat_without_bad_event, NULL, NULL);
+    if(!rb_runqlat_without_bad){
+        fprintf(stderr, "Failed to create ring buffer for runqlat without bad\n");
         return err;
     }
 
@@ -3204,6 +3291,14 @@ static int cpu_ring_buffer_poll(){
         return err; 
     }
 
+    err = ring_buffer__poll(rb_runqlat_without_bad,200);
+    if (err == -EINTR) {
+        return err;   // 捕捉到退出信号时停止
+    } else if (err < 0) {
+        fprintf(stderr, "Error polling process stat ring buffer: %d\n", err);
+        return err; 
+    }
+
     return 0;
 }
 
@@ -3217,6 +3312,10 @@ static void cpu_resource_clean(){
         ring_buffer__free(rb_process);
     if (rb_runqlat)
         ring_buffer__free(rb_runqlat);
+    if (rb_backtrace)
+        ring_buffer__free(rb_backtrace);
+    if (rb_runqlat_without_bad)
+        ring_buffer__free(rb_runqlat_without_bad);
     
     for(int i=0;i<MAX_CSV_FILES;i++){
         if(cpu_csv_files[i] != NULL)

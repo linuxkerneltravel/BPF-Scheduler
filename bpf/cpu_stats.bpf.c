@@ -77,6 +77,7 @@ DEFINE_BPF_MAP(process_occupied_map,BPF_MAP_TYPE_HASH,512,u32,u32);
 // 任务延迟计数统计
 // 对数增长,8个区间
 DEFINE_BPF_MAP(runqlat_map,BPF_MAP_TYPE_ARRAY,MAX_LATENCY_BUCKETS,u32,u32);
+DEFINE_BPF_MAP(runqlat_without_bad_map,BPF_MAP_TYPE_ARRAY,MAX_LATENCY_BUCKETS,u32,u32);
 
 // 环形缓冲区传递数据
 struct {
@@ -96,8 +97,13 @@ struct {
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
-    __uint(max_entries, 32 * 1024);  // 环形缓冲区大小为 32 KB
+    __uint(max_entries, 64 * 1024);  // 环形缓冲区大小为 32 KB
 } runqlat_buffer SEC(".maps");
+
+struct {
+    __uint(type, BPF_MAP_TYPE_RINGBUF);
+    __uint(max_entries, 64 * 1024);  // 环形缓冲区大小为 64 KB
+} runqlat_without_bad_buffer SEC(".maps");
 
 struct {
     __uint(type, BPF_MAP_TYPE_RINGBUF);
@@ -574,7 +580,7 @@ int record_task_switch(struct trace_event_raw_sched_switch *ctx)
                     cpu_usage->usr_times += delta;
                 }
                 pre_usage->total_time_ns += delta;
-                task_concerned_update(pre_usage,60);
+                task_concerned_update(pre_usage,30);
 
                 if(pre_usage->task_info.tgid != 0){
                     u32 tgid = pre_usage->task_info.tgid;
@@ -635,6 +641,17 @@ int record_task_switch(struct trace_event_raw_sched_switch *ctx)
             }else{
                 *latency = *latency + 1;
                 bpf_map_update_elem(&runqlat_map,&bucket,latency,BPF_ANY);
+            }
+            
+            u32 *is_bad = bpf_map_lookup_elem(&thread_occupied_map,&next_pid);
+            if(is_bad != NULL){
+                u32 *run_count = bpf_map_lookup_elem(&runqlat_without_bad_map,&bucket);
+                if(!run_count){
+                    bpf_map_update_elem(&runqlat_without_bad_map,&bucket,&one,BPF_ANY);
+                }else{
+                    *run_count = *run_count + 1;
+                    bpf_map_update_elem(&runqlat_without_bad_map,&bucket,run_count,BPF_ANY);
+                }
             }
 
             if(next_usage->last_run_time < cpu_usage->last_clear_time){
@@ -1021,137 +1038,6 @@ static int update_cpu_usage_percent(void){
     return 0;
 }
 
-// static int perf_update_task_concerd(void){
-//     //struct hash_table *table = bpf_map_lookup_elem(&thread_occupied_map,&zero);
-//     u64 now = bpf_ktime_get_ns();
-//     // if(!table)
-//     //     return -1;
-//     struct task_cpu_usage *task;
-//     u32 flag = 0,index = 0;
-//     //u32 flag = hash_table_foreach(table,0);
-//     //u32 count = 0;
-//     struct data_list *list = bpf_map_lookup_elem(&occupied_list,&zero);
-//     if(!list)
-//         return 0;
-//     for(index = 0;index<50;index++)
-//     {
-//         if(list->list[index] == 0)
-//             continue;
-//         flag = list->list[index];
-//         //bpf_printk("current task is %u",flag);
-//         // if(count > 128*6)
-//         //     return -2;
-//         // count++;
-//         task = bpf_map_lookup_elem(&task_cpu_usage_map,&flag);
-//         if(task != NULL){
-//             if(task->last_run_time == 0)
-//                 continue;
-//             if(task->last_run_time < now - (2*HALF_SECOND))
-//             {
-//                 // 删除过时的元素
-//                 //hash_table_delete(table,flag);
-//                 bpf_map_delete_elem(&thread_occupied_map,&flag);
-//                 list->list[index] = 0;
-//             }
-//             else{
-//                 task->already_backtrace = false;
-//                 task->total_percent = task->total_time_ns * 100/ HALF_SECOND;
-//                 task->kernel_percent = task->kernel_time_ns * 100/task->total_time_ns;
-//                 task->user_percent = task->user_time_ns * 100/task->total_time_ns;
-//                 if(task->total_percent > 5){
-//                     struct task_cpu_usage *buff = bpf_ringbuf_reserve(&task_occupied_buffer,sizeof(struct task_cpu_usage),0);
-//                     if(!buff){
-//                         bpf_printk("task ringbuff reserve failed\n");
-//                     }
-//                     else{
-//                         memset(buff,0,sizeof(struct task_cpu_usage));
-//                         bpf_probe_read_kernel_str(buff->task_info.comm,sizeof(task->task_info.comm),task->task_info.comm);                       
-//                         buff->task_info.pid = task->task_info.pid;
-//                         buff->total_percent = task->total_percent > 100 ? 99:task->total_percent;
-//                         buff->kernel_percent = task->kernel_percent > 100 ? 99:task->kernel_percent;
-//                         buff->user_percent = task->user_percent > 100 ? 99:task->user_percent;
-//                         bpf_ringbuf_submit(buff,0);
-//                     }
-//                 }else{
-//                     // 删除阈值不达标的元素
-//                     //hash_table_delete(table,flag);
-//                     bpf_map_delete_elem(&thread_occupied_map,&flag);
-//                     list->list[index] = 0;
-//                 }
-//                 bpf_map_update_elem(&task_cpu_usage_map,&flag,task,BPF_ANY);
-//             }
-//         }
-//         u32 _flag = flag;
-//         //flag = hash_table_foreach(table,_flag);
-//     }
-//     //bpf_map_update_elem(&thread_occupied_map,&zero,table,BPF_ANY);
-//     bpf_map_update_elem(&occupied_list,&zero,list,BPF_ANY);
-//     return 0;
-// }
-
-// static int perf_update_process_concerd(void){
-//     //struct hash_table *table = bpf_map_lookup_elem(&process_occupied_map,&zero);
-//     u64 now = bpf_ktime_get_ns();
-//     // if(!table)
-//     //     return -1;
-//     struct process_struct *ps;
-//     u32 flag = 0,index = 0;
-//     //u32 flag = hash_table_foreach(table,0);
-//     //u32 count = 0;
-//     struct data_list *list = bpf_map_lookup_elem(&occupied_list,&one);
-//     if(!list)
-//         return 0;
-//     for(index = 0;index<50;index++)
-//     {
-//         if(list->list[index] == 0)
-//             continue;
-//         flag = list->list[index];
-//         //bpf_printk("current process is %u",flag);
-//         // if(count > 128*6)
-//         //     return -2;
-//         // count++;
-//         ps = bpf_map_lookup_elem(&process_map,&flag);
-//         if(ps != NULL){
-//             if(ps->total_use_time == 0)
-//                 continue;
-//             if(ps->last_total_clear < now - (2*HALF_SECOND))
-//             {
-//                 // 删除过时的元素
-//                 //hash_table_delete(&table,flag);
-//                 bpf_map_delete_elem(&process_occupied_map,&flag);
-//                 list->list[index] = 0;
-//             }
-//             else{
-//                 ps->total_use_percent = ps->total_use_time *100 / HALF_SECOND;
-//                 if(ps->total_use_percent > 10){
-//                     struct process_struct *buff = bpf_ringbuf_reserve(&process_occupied_buffer,sizeof(struct process_struct),0);
-//                     if(!buff){
-//                         bpf_printk("ps ringbuff reserve failed\n");
-//                     }
-//                     else{
-//                         memset(buff,0,sizeof(struct process_struct));
-//                         buff->kids_length = ps->kids_length;
-//                         buff->tgid = ps->tgid;
-//                         buff->total_use_percent = ps->total_use_percent;
-//                         bpf_ringbuf_submit(buff,0);
-//                     }
-//                 }else{
-//                     // 删除阈值不达标的元素
-//                     //hash_table_delete(&table,flag);
-//                     bpf_map_delete_elem(&process_occupied_map,&flag);
-//                     list->list[index] = 0;
-//                 }
-//                 bpf_map_update_elem(&process_map,&flag,ps,BPF_ANY);
-//             }
-//         }
-//         u32 _flag = flag;
-//         //flag = hash_table_foreach(table,_flag);
-//     }
-//     //bpf_map_update_elem(&process_occupied_map,&zero,table,BPF_ANY);
-//     bpf_map_update_elem(&occupied_list,&one,list,BPF_ANY);
-//     return 0;
-// }
-
 static int perf_runqlat(void){
     struct runqlat_perf_data *buff = bpf_ringbuf_reserve(&runqlat_buffer,sizeof(struct runqlat_perf_data),0);
     if(!buff)
@@ -1163,6 +1049,27 @@ static int perf_runqlat(void){
     for(u32 index=0;index<MAX_LATENCY_BUCKETS;index++){
         u32 i = index;
         u32 *size = bpf_map_lookup_elem(&runqlat_map,&i);
+        if(!size)
+            buff->data[index] = 0;
+        else
+            buff->data[index] = *size;
+    }
+    bpf_ringbuf_submit(buff,0);
+
+    return 0;
+}
+
+static int perf_runqlat_without_bad(void){
+    struct runqlat_perf_data *buff = bpf_ringbuf_reserve(&runqlat_without_bad_buffer,sizeof(struct runqlat_perf_data),0);
+    if(!buff)
+    {
+        bpf_printk("runqlat ringbuff reserve failed\n");
+        return 0;
+    }
+    memset(buff,0,sizeof(struct runqlat_perf_data));
+    for(u32 index=0;index<MAX_LATENCY_BUCKETS;index++){
+        u32 i = index;
+        u32 *size = bpf_map_lookup_elem(&runqlat_without_bad_map,&i);
         if(!size)
             buff->data[index] = 0;
         else
@@ -1191,36 +1098,14 @@ int handle_cpu_event(struct bpf_perf_event_data *ctx){
     return 0;
 }
 
-// SEC("perf_event")
-// int handle_task_usage_event(struct bpf_perf_event_data *ctx){
-//     int res = perf_update_task_concerd();
-//     //bpf_printk("task perf finish");
-//     if(res == -1)
-//         bpf_printk("the task_occupied_map is not init\n");
-//     else if(res == -2)
-//         bpf_printk("out of index, there may be exist infinit loop\n");
-//     return 0;
-// }
-
-// SEC("perf_event")
-// int handle_process_stat_event(struct bpf_perf_event_data *ctx){
-//     int res = perf_update_process_concerd();
-//     //bpf_printk("task perf finish");
-//     if(res == -1)
-//         bpf_printk("the process_occupied_map is not init\n");
-//     else if(res == -2)
-//         bpf_printk("out of index, there may be exist infinit loop\n");
-//     return 0;
-// }
-
 SEC("perf_event")
 int handle_sys_latency_event(struct bpf_perf_event_data *ctx){
     perf_runqlat();
     return 0;
 }
 
-// SEC("perf_event")
-// int handle_task_backtrace_event(struct bpf_perf_event_data *ctx){
-//     perf_task_backtrace();
-//     return 0;
-// }
+SEC("perf_event")
+int handle_sys_latency_without_bad_event(struct bpf_perf_event_data *ctx){
+    perf_runqlat_without_bad();
+    return 0;
+}

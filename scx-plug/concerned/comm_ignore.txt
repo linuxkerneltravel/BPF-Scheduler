@@ -1,0 +1,7 @@
+code
+Compositor
+gnome-shell
+scx_spy
+cpptools
+llvmpipe-0
+kworker

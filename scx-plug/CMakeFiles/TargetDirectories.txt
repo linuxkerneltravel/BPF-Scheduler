@@ -1,0 +1,3 @@
+/home/ne0/sys_competition/start/cpu_watcher/CMakeFiles/cpu_watcher.dir
+/home/ne0/sys_competition/start/cpu_watcher/CMakeFiles/edit_cache.dir
+/home/ne0/sys_competition/start/cpu_watcher/CMakeFiles/rebuild_cache.dir

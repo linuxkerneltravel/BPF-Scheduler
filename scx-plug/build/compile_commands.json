@@ -1,0 +1,7 @@
+[
+{
+  "directory": "/home/ne0/sys_competition/start/cpu_watcher/build",
+  "command": "/usr/bin/clang-17 -I/home/ne0/sys_competition/start/cpu_watcher/.output -I/home/ne0/sys_competition/start/cpu_watcher/../../../libbpf/include/uapi -I/home/ne0/sys_competition/start/cpu_watcher/../vmlinux/x86 -I/home/ne0/sys_competition/start/cpu_watcher/home/ne0/sys_competition/start/blazesym/include -I/home/ne0/sys_competition/start/cpu_watcher/./include -g -Wall -g -std=gnu11 -o CMakeFiles/cpu_watcher.dir/sys_spy.c.o -c /home/ne0/sys_competition/start/cpu_watcher/sys_spy.c",
+  "file": "/home/ne0/sys_competition/start/cpu_watcher/sys_spy.c"
+}
+]
