@@ -140,7 +140,7 @@ static void print_underline(const char *str);
 static void scx_print_stat_grp(enum nest_stat_group grp);
 static void print_active_nests(const struct scx_nest_bpf *skel);
 
-static int attach_scx_skel(struct scx_nest_bpf *skel);
+static int attach_scx_skel();
 static int scx_operation();
 static void scx_resource_clean();
 
@@ -433,7 +433,7 @@ restart:
             if(ret != 0)
                 goto cleanup;
         }
-        ret = attach_scx_skel(scx_skel);
+        ret = attach_scx_skel();
         if(ret != 0)
             goto cleanup;
         // if(env_data.visualize){
