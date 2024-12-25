@@ -4,6 +4,7 @@
 #include <sys/resource.h>
 #include <sys/sysinfo.h>
 #include <sys/select.h>
+#include <sys/file.h>  // flock
 #include <unistd.h> 
 #include <errno.h>
 #include <asm/unistd.h>
@@ -69,6 +70,8 @@ int cores = 0;// 核心数
 
 int concerned_map_fd[4];
 
+FILE *concerned_files[4];
+
 const char *concerned_names[] = {
     "comm_ignore.txt",
     "id_ignore.txt",
@@ -126,7 +129,7 @@ static int attach_scx_skel();
 static int scx_operation();
 static void scx_resource_clean();
 
-static int update_scx_concerned();
+int process_concerned_files(FILE *concerned_files[], int concerned_map_fd[], int num_files);
 
 static int handle_usr_cpu_mask_event(void *ctx, void *data, size_t data_sz);
 
@@ -142,10 +145,6 @@ int main(int argc, char **argv){
 
 restart:
     //printf("----------------------------------------\n");
-    ret = init_time();
-    if(ret != 0)
-        goto cleanup;
-
     ret = get_proc_path();
     if(ret != 0)
         goto cleanup;
@@ -162,6 +161,10 @@ restart:
         ret = scx_operation();
         if(ret != 0)
             goto cleanup;
+        ret = process_concerned_files(concerned_files,concerned_map_fd,4);
+        if(ret != 0)
+            goto cleanup;
+        sleep(1);
     }
 
 
@@ -245,50 +248,44 @@ static struct bpf_link* attach_perf_event_to_program(struct bpf_program *prog, u
 
 /*-----------------------------------------sched_ext部分------------------------------*/
 // 函数：将任务名加载到 eBPF Map 中
-int load_tasks_name_to_map(const char *filename, int map_fd) {
-    // int map_fd = bpf_map__fd(scx_skel->maps.comm_ignore_map);
-    // if(map_fd < 0){
-    //     fprintf(stderr, "Failed to get comm_ignore_map map fd\n");
-    //     return -1;
-    // }
-    FILE *file = fopen(filename, "r");
-    if (!file) {
-        perror("Failed to open ignore.txt");
+int load_tasks_name_to_map(const char *comm,int map_fd) {
+    struct comm_info info = {};
+    strncpy(info.comm, comm, sizeof(info.comm));
+
+    // 将任务名加载到 eBPF Map 中
+    if(bpf_map_update_elem(map_fd,&info,&zero,BPF_ANY) != 0){
+        if(errno == EEXIST){
+            return 0;
+        }
+        fprintf(stderr, "Failed to update map %d\n", map_fd);
         return -1;
     }
 
-    char line[256]; // 用于存储每行数据
-    struct comm_info task_key;
-    u32 value = 0; // 值，用于标志该任务需要被忽略
-    int line_count = 0;
+    return 0;
+}
 
-    while (fgets(line, sizeof(line), file)) {
-        // 移除行末的换行符
-        line[strcspn(line, "\n")] = '\0';
-
-        // 初始化任务名结构体
-        memset(&task_key, 0, sizeof(task_key));
-
-        // 如果任务名超出 16 字节，则截断
-        if (strlen(line) >= sizeof(task_key.comm)) {
-            fprintf(stderr, "Task name '%s' exceeds 16 characters, truncating.\n", line);
-            strncpy(task_key.comm, line, sizeof(task_key.comm) - 1);
-        } else {
-            strncpy(task_key.comm, line, sizeof(task_key.comm) - 1);
+int load_task_id_to_map(u32 id, int map_fd){
+    if(bpf_map_update_elem(map_fd,&id,&zero,BPF_ANY) != 0){
+        if(errno == EEXIST){
+            return 0;
         }
+        fprintf(stderr, "Failed to update map %d\n", map_fd);
+        return -1;
+    }
+}
 
-        // 将任务名存入 eBPF Map
-        if (bpf_map_update_elem(map_fd, &task_key, &value, BPF_ANY) < 0) {
-            perror("Failed to update comm_ignore_map");
-            fclose(file);
+static int sched_link_txt_to_FILE(){
+    char filepath[256]; // 用于存储完整文件路径
+    for(int i=0;i<4;i++){
+        snprintf(filepath, sizeof(filepath), "./concerned/%s", concerned_names[i]);
+
+        concerned_files[i] = fopen(filepath, "r");
+        if (concerned_files[i] == NULL) {
+            // 打开失败时，打印错误并返回 -1
+            perror(filepath);
             return -1;
         }
-
-        line_count++;
     }
-
-    fclose(file);
-    printf("Successfully loaded %d tasks into comm_ignore_map.\n", line_count);
     return 0;
 }
 
@@ -357,14 +354,76 @@ static int handle_usr_cpu_mask_event(void *ctx, void *data, size_t data_sz){
     }
 }
 
-static int update_scx_concerned(){
 
+int process_concerned_files(FILE *concerned_files[], int concerned_map_fd[], int num_files) {
+    char line[256];  // 用于存储读取的行数据
+    static long last_offsets[4] = {0};  // 保存上次读取到的文件偏移量
+    int ret;
 
+    for (int i = 0; i < num_files; i++) {
+        if (concerned_files[i] == NULL) {
+            fprintf(stderr, "File pointer at index %d is NULL.\n", i);
+            continue;
+        }
+
+        // 获取文件描述符
+        int fd = fileno(concerned_files[i]);
+
+        // 尝试加读锁
+        if (flock(fd, LOCK_SH) != 0) {  // 使用共享锁，允许其他读取操作
+            fprintf(stderr, "Failed to acquire lock for file %d: %s. Skipping...\n", i, strerror(errno));
+            continue;  // 如果无法加锁，跳过该文件
+        }
+
+        // 将文件指针移动到上次偏移位置
+        fseek(concerned_files[i], last_offsets[i], SEEK_SET);
+
+        // 逐行读取文件
+        while (fgets(line, sizeof(line), concerned_files[i]) != NULL) {
+            line[strcspn(line, "\n")] = '\0';  // 去除换行符
+
+            if (i % 2 == 0) {
+                // 对偶数索引文件加载任务名称
+                ret = load_tasks_name_to_map(line, concerned_map_fd[i]);
+                if (ret < 0) {
+                    fprintf(stderr, "Failed to load tasks name to map for file %d.\n", i);
+                    flock(fd, LOCK_UN);  // 释放锁
+                    return -1;
+                }
+            } else {
+                // 对奇数索引文件加载任务 ID
+                u32 id = atoi(line);
+                ret = load_task_id_to_map(id, concerned_map_fd[i]);
+                if (ret < 0) {
+                    fprintf(stderr, "Failed to load tasks id to map for file %d.\n", i);
+                    flock(fd, LOCK_UN);  // 释放锁
+                    return -1;
+                }
+            }
+
+            // 更新文件偏移量
+            last_offsets[i] = ftell(concerned_files[i]);
+        }
+
+        // 释放锁
+        flock(fd, LOCK_UN);
+    }
+
+    return 0;  // 成功处理所有文件
 }
 
 static int attach_scx_skel()
 {
+    int ret;
     libbpf_set_print(scx_libbpf_print_fn);
+
+    // 打开concerned的文件
+    ret = sched_link_txt_to_FILE();
+    if(ret != 0){
+        fprintf(stderr, "Failed to link concerned files to FILE\n");
+        return -1;
+    }
+
     scx_skel = SCX_OPS_OPEN(nest_ops, scx_nest_bpf);
     if (!scx_skel) {
         fprintf(stderr, "Failed to open SCX skeleton.\n");
@@ -380,6 +439,7 @@ static int attach_scx_skel()
             pclose(fp);
         }
     }
+    //printf("cores: %d------------------------------------\n", cores);
     // 初始化只读数据
     //scx_skel->rodata->nr_cpus = libbpf_num_possible_cpus();
     scx_skel->rodata->nr_cpus = cores;
@@ -425,28 +485,6 @@ static int attach_scx_skel()
     //     return -1;
     // }
 
-    
-    
-    // int map_fd = bpf_map__fd(scx_skel->maps.comm_ignore_map);
-    // if(map_fd < 0){
-    //     fprintf(stderr, "Failed to get comm_ignore_map map fd\n");
-    //     return -1;
-    // }
-    // int ret = load_tasks_name_to_map(ignore_file, map_fd);
-    // if(ret < 0){
-    //     fprintf(stderr, "Failed to load tasks name to comm_ignore_map\n");
-    //     return -1;
-    // }
-    // map_fd = bpf_map__fd(scx_skel->maps.comm_attention_map);
-    // if(map_fd < 0){
-    //     fprintf(stderr, "Failed to get comm_attention_map map fd\n");
-    //     return -1;
-    // }
-    // ret = load_tasks_name_to_map(attention_file, map_fd);
-    // if(ret < 0){
-    //     fprintf(stderr, "Failed to load tasks name to comm_attention_map\n");
-    //     return -1;
-    // }
     concerned_map_fd[0] = bpf_map__fd(scx_skel->maps.comm_ignore_map);
     if(concerned_map_fd[0] < 0){
         fprintf(stderr, "Failed to get comm_ignore_map map fd\n");
@@ -465,6 +503,12 @@ static int attach_scx_skel()
     concerned_map_fd[3] = bpf_map__fd(scx_skel->maps.id_attention_map);
     if(concerned_map_fd[3] < 0){
         fprintf(stderr, "Failed to get id_attention_map map fd\n");
+        return -1;
+    }
+
+    ret = process_concerned_files(concerned_files, concerned_map_fd, 4);
+    if(ret < 0){
+        fprintf(stderr, "Failed to process concerned files\n");
         return -1;
     }
 
@@ -498,6 +542,10 @@ static void scx_resource_clean()
         else   
             break;
     }
+    for(int i=0;i<4;i++){
+        if(concerned_files[i])
+            fclose(concerned_files[i]);
+    }
 }
 
 static int scx_operation()
@@ -510,7 +558,7 @@ static int scx_operation()
         slow_count++;
     }
     else{
-        bool visual = env_data.visualize && sched_txt_files[1];
+        bool visual = sched_txt_files[1] != NULL;
         if(visual)
             fprintf(sched_txt_files[1], "----------------------------------------");
 
@@ -616,7 +664,7 @@ static void print_active_nests(const struct scx_nest_bpf *skel)
 
 	memset(cpus, 0, nr_cpus + 1);
 
-    bool visual = env_data.visualize && sched_txt_files[0];
+    bool visual = sched_txt_files[0] != NULL;
     // bool visual = false;
 
     if(visual){

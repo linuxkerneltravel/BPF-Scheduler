@@ -22,7 +22,7 @@ CFLAGS := -g -Wall
 ALL_LDFLAGS := $(LDFLAGS) $(EXTRA_LDFLAGS)
 
 APPS = scx_nest
-TARGETS = scx_spy
+TARGETS = scx_plug
 CONTROLLER := cpu_controller
 
 SRC_DIR = ./include
