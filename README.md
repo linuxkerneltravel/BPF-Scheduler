@@ -1,17 +1,20 @@
 # 基于eBPF的系统状况监测和基于sched_ext的自动化控制
 
 ## 简介
+
 本项目主要分为两个大方面
+
 1. 基于 eBPF 的内核观测工具开发
 
    该模块利用 eBPF（Extended Berkeley Packet Filter）技术，构建了一套可实时观测 Linux 内核运行状态和行为的工具集。主要涵盖以下四个方面：
+
    - CPU 监控：捕捉 CPU 使用率、线程以及进程的cpu占用率、任务调度延迟等关键指标
    - 内存观测：分析内存使用率、跟踪内存分配、监测OOM事件等
    - IO 分析：记录整体的IO读写延迟、线程和进程的读写量
    - 网络行为监测：处理网络延迟相关事件、记录了TCP 往返时延（RTT，Round-Trip Time）、统计和分析 TCP 连接中流量最多的会话、
      处理 TCP 重传事件，监控数据包的重传情况
-
 2. 基于sched_ext的自动化控制
+
 - 在上述观测数据的基础上，本项目进一步结合 Linux 内核最新引入的 sched_ext 调度扩展技术，通过实时数据驱动，实现自动化的系统性能优化和资源调度控制。
 - 以往的基于ebpf的性能分析程序，除了网络部分之外，基本都是止步于监测，难以对有问题的任务进行有效而灵活的控制
 - 从今年9月份sched_ext引入内核后，用户态自定义内核调度器成为可能，本项目首先对内核调度器架构进行了深入的解析
@@ -20,16 +23,16 @@
   - sched_ext的整体架构
 - 在深入理解原理之上，本项目完善了一个调度器，经过测试在高压情况下要性能要明显优于系统默认的CFS调度器
 
-
 补充一下，这个分支主要都是我在虚拟机上写的，一直git更新的用户就是我的GitHub账号 https://github.com/restart126
 
 所有的视频文件都来自链接: https://pan.baidu.com/s/1h8lBofO8eoIwl1hw-mHSJA?pwd=osos 提取码: osos
 
-
 ## 环境搭建
+
 对于具体的环境配置还有代码的运行环境，一切都在[这里](Document/环境搭建.md)，为了简洁这里就不多介绍了
 
 ## 对系统性能的影响
+
 在htop的输出中可以很清晰的显示出来
 ![img_32.jpg](Document%2Fimg_32.jpg)
 
@@ -38,7 +41,9 @@
 启用sched_ext调度器会使得cpu占用率有所上升，但整体仍然不超过1%
 
 ## 代码架构
+
 核心的文件夹是include（定义了一些结构体和函数）和bpf（这里是内核态bpf代码的部分）
+
 ```
 include/                        # 头文件目录
 ├── bpf-compat/                 # scx需要的部分
@@ -55,6 +60,7 @@ include/                        # 头文件目录
 ├── scx_nest.h                  # scx-nest部分
 └── scx_nest_stats_table.h      # scx-nest部分
 ```
+
 ```
 bpf/                                 # eBPF 程序目录
 ├── cpu_stats.bpf.c                 # CPU 性能统计的 eBPF 程序
@@ -64,6 +70,7 @@ bpf/                                 # eBPF 程序目录
 ├── net_stats.bpf.c                 # 网络性能监控的 eBPF 程序
 └── scx_nest.bpf.c                  # scx-nest相关的 eBPF 程序
 ```
+
 ```
 /                                   # 项目的用户态代码部分，各个模块都先测试，然后整合在一起
 ├── io_spy.c                        # IO 监控模块用户态代码
@@ -75,6 +82,7 @@ bpf/                                 # eBPF 程序目录
 ├── sched_ext.c                     # scx-nest模块用户态代码
 └── scx_nest.c                      # 弃用
 ```
+
 ```
 visualize/                          # 可视化部分与文档输出
 ├── run/                            # 程序运行时候存储的本地csv文件
@@ -87,10 +95,11 @@ visualize/                          # 可视化部分与文档输出
 ├── net_with_delay.sh               # 网络测试脚本，里面可以自定义延迟和掉包率，测试60s
 └── visual.sh                       # 运行它可以同时把所有传递Prometheus的脚本（*_data_analyse.py）都运行
 ```
+
 ```
 Document/                           # 文档
 ├── sched/                          # 对内核中task_struct结构和调度子系统的解析
-├── sched_ext/                           
+├── sched_ext/                         
       ├── sched_ext.md              # sched_ext整体架构和核心函数的解析
       └── README.zh.md              # scx-nest的官方中文文档
 ├── cpu.md                          # CPU 监控程序的思路和实验
@@ -105,7 +114,9 @@ Document/                           # 文档
 我在这里进一步强调一下，scx_spy.c是scx分支的目标文件，拥有包括sched_ext的完整功能，os_spy.c是main分支的目标文件，拥有整个系统监测的功能
 
 ## cpu监测部分
+
 编译好之后，对于普通版本和sched_ext的版本分别这样执行
+
 ```shell
 sudo ./os_spy -c
 sudo ./scx_spy -c
@@ -115,6 +126,7 @@ sudo ./scx_spy -c
 ```
 
 内核态bpf的实现部分在[这里](bpf/cpu_stats.bpf.c)，从最后的功能实现来看，分为以下几个部分
+
 - 每个cpu的使用情况：空闲时间占比，内核态时间占比，用户态时间占比，中断时间占比，软中断时间占比
 - cpu占用率高的task的情况：包括pid、线程名、占用cpu的时间占比，在整个运行时间中内核态时间和用户态时间的占比
 - cpu占用率高的进程的情况：包括进程的tgid，占用cpu的时间占比，进程中的线程数
@@ -125,16 +137,19 @@ sudo ./scx_spy -c
 
 具体的情况和实验请看[这里](Document/cpu.md)
 
-
 ## io监测部分
+
 编译好之后，对于普通版本和sched_ext的版本分别这样执行
+
 ```shell
 sudo ./os_spy -I
 sudo ./scx_spy -I
 # 对于scx_spy，-e可以启用scx-nest调度模式
 # 可以加上-v，这样可以把记录的数据保存在本地
 ```
+
 内核态的bpf代码在[这里](bpf/io_stats.bpf.c)，从最后功能来看，可以分为以下部分
+
 - 各磁盘设备及其分区的读写的情况
 - 读写频率高的task的情况：包括pid、线程名、在时间窗口内的读次数和写次数
 - 读写频率高的进程的情况：包括tgid、在时间窗口内的读次数和写次数
@@ -145,16 +160,19 @@ sudo ./scx_spy -I
 
 具体的情况和实验请看[这里](Document/io.md)
 
-
 ## memory监测部分
+
 编译好之后，对于普通版本和sched_ext的版本分别这样执行
+
 ```shell
 sudo ./os_spy -m
 sudo ./scx_spy -m
 # 对于scx_spy，-e可以启用scx-nest调度模式
 # 可以加上-v，这样可以把记录的数据保存在本地
 ```
+
 内核态的bpf代码在[这里](bpf/mm_stats.bpf.c)和[这里](bpf/mm_leak.bpf.c)，可以总结为以下部分
+
 - 记录系统当前内存的情况：当前已使用的内存占比、可用内存占比、有多少swap memory等
 - 参考 https://github.com/eunomia-bpf/bpf-developer-tutorial/tree/main/src/16-memleak 记录了个内核的内存分配事件
 - 内存分配或释放频率高的task的监视：包括task自身的信息、kmem、vmem、slab等分配的情况
@@ -167,18 +185,22 @@ sudo ./scx_spy -m
 具体的情况和实验请看[这里](Document/memory.md)
 
 ## net监测部分
+
 编译好之后，对于普通版本和sched_ext的版本分别这样执行
+
 ```shell
 sudo ./os_spy -n
 sudo ./scx_spy -n
 # 对于scx_spy，-e可以启用scx-nest调度模式
 # 可以加上-v，这样可以把记录的数据保存在本地
 ```
+
 内核态的bpf代码在[这里](bpf/net_stats.bpf.c)
 
 因为net监测部分是我处理sched_ext部分以外最后一个写的，所以这时候写道思路最清晰，对于目标也最清晰，
 我的想法就是直接找bcc的相关功能复现，因为bcc大部分都是python写的，我相当是针对它的功能用libbpf的架构进行了复现，
 具体来说复现了以下几个部分
+
 - 系统整体的网络接口统计信息
 - tcptop
 - tcprtt
@@ -191,7 +213,9 @@ tcpretrans记录系统中 TCP 重传的具体事件，精确定位是哪些任�
 具体的情况和实验请看[这里](Document/net.md)
 
 ## scx-nest调度器设计
+
 在讲基于sched_ext的调度器设计之前，需要先补充一下Linux调度器的大体架构，我对这里做了详细的分析，文档在这里
+
 - [task_struct结构体分析](Document/sched/任务的内核态表示.md)
 - [Linux内核调度器介绍](Document/sched/调度.md)
 - [sched_ext架构介绍](Document/sched_ext/sched_ext.md)
@@ -201,6 +225,7 @@ tcpretrans记录系统中 TCP 重传的具体事件，精确定位是哪些任�
 了解了上面的基础之后，接下来讲讲基于sched_ext的scx-nest的设计
 
 ### scx-nest
+
 scx-nest整体上是基于 https://github.com/eunomia-bpf/bpf-developer-tutorial/tree/main/src/45-scx-nest 这个的架构，
 在它基础之上改进了它存在的一些问题，同时联合我的系统性能监测程序，实现了自动化控制，关于官方的scx-nest的文档在[这里](Document/sched_ext/README.zh.md)，
 我这里一边分析它的源码一边讲讲我的改进思路
@@ -219,41 +244,43 @@ scx-nest整体上是基于 https://github.com/eunomia-bpf/bpf-developer-tutorial
     - 如果任务需要一个核心但 Primary Nest 中没有空闲核心，则会尝试使用 Reserve Nest 或 CFS 默认策略
     - 主要负责高频任务的调度和核心复用
 - Reserve Nest（备用集合）
-   - 作用
-     - Reserve Nest 是一个次级核心集合，用于存储较少使用或最近刚从 Primary Nest 移出的核心
-     - 当 Primary Nest 无法提供合适的核心时，Reserve Nest 提供后备选择，减少任务分散到系统中其他完全空闲的核心
+  - 作用
+    - Reserve Nest 是一个次级核心集合，用于存储较少使用或最近刚从 Primary Nest 移出的核心
+    - 当 Primary Nest 无法提供合适的核心时，Reserve Nest 提供后备选择，减少任务分散到系统中其他完全空闲的核心
   - 特点
-     - 有固定的最大大小限制
-     - 如果任务频繁寻找核心但未能在 Primary Nest 中分配到空闲核心，则可能触发 Reserve Nest 的扩展
-     - 核心从 Primary Nest 降级后通常会进入 Reserve Nest，而不是直接变成空闲核心
-     - 提供灵活性，避免频繁降级核心导致性能抖动，任务负载变化的情况下，Reserve Nest 减少核心频繁进入深度空闲状态
+    - 有固定的最大大小限制
+    - 如果任务频繁寻找核心但未能在 Primary Nest 中分配到空闲核心，则可能触发 Reserve Nest 的扩展
+    - 核心从 Primary Nest 降级后通常会进入 Reserve Nest，而不是直接变成空闲核心
+    - 提供灵活性，避免频繁降级核心导致性能抖动，任务负载变化的情况下，Reserve Nest 减少核心频繁进入深度空闲状态
 - Idle Mask（空闲核心集合）
   - 作用
-     - 统计和跟踪系统中完全空闲的核心，但不直接用于任务分配
-     - 用于支持调度器判断是否需要扩展 Primary Nest 或 Reserve Nest
+    - 统计和跟踪系统中完全空闲的核心，但不直接用于任务分配
+    - 用于支持调度器判断是否需要扩展 Primary Nest 或 Reserve Nest
   - 特点
-     - 如果启用了寻找完全空闲核心的策略（find_fully_idle），调度器可能会将某些任务分配到空闲核心，以追求更高的整体性能
-     - 仅在必要时被使用，例如当 Primary 和 Reserve Nest 都没有合适的核心时
+    - 如果启用了寻找完全空闲核心的策略（find_fully_idle），调度器可能会将某些任务分配到空闲核心，以追求更高的整体性能
+    - 仅在必要时被使用，例如当 Primary 和 Reserve Nest 都没有合适的核心时
 - Other Mask（其他核心集合）
   - 作用
-     - 包括不属于 Primary Nest 和 Reserve Nest 的核心，通常被用作最后的选择
-     - 当 Primary 和 Reserve Nest 无法满足需求时，任务会被分配到这些核心
+    - 包括不属于 Primary Nest 和 Reserve Nest 的核心，通常被用作最后的选择
+    - 当 Primary 和 Reserve Nest 无法满足需求时，任务会被分配到这些核心
   - 特点
-     - 这些核心可能较长时间未被使用，初始频率较低
-     - 频繁使用 Other Mask 会导致核心复用效率降低
+    - 这些核心可能较长时间未被使用，初始频率较低
+    - 频繁使用 Other Mask 会导致核心复用效率降低
 
 大体的流程如下
+
 - 任务分配优先级
-   - 优先尝试在 Primary Nest 中寻找空闲核心
-   - 如果 Primary Nest 无法满足要求，则检查 Reserve Nest
-   - 如果 Reserve Nest 也无法满足，则可能尝试完全空闲核心（Idle Mask）或其他默认策略（如 CFS 分配）
+  - 优先尝试在 Primary Nest 中寻找空闲核心
+  - 如果 Primary Nest 无法满足要求，则检查 Reserve Nest
+  - 如果 Reserve Nest 也无法满足，则可能尝试完全空闲核心（Idle Mask）或其他默认策略（如 CFS 分配）
 - 动态调整
-   - Primary Nest 缩减: 如果核心长时间未使用，则会从 Primary Nest 降级到 Reserve Nest
-   - Reserve Nest 限制: 如果 Reserve Nest 达到最大容量，多余的核心将被移除
-   - 任务饥饿处理: 如果任务频繁无法分配到核心，会扩大 Primary Nest 的范围以解决拥塞
+  - Primary Nest 缩减: 如果核心长时间未使用，则会从 Primary Nest 降级到 Reserve Nest
+  - Reserve Nest 限制: 如果 Reserve Nest 达到最大容量，多余的核心将被移除
+  - 任务饥饿处理: 如果任务频繁无法分配到核心，会扩大 Primary Nest 的范围以解决拥塞
 
 2. 重要的几个ebpf_map
-存储每个物理核心的上下文信息，主要与核心的压缩（compaction）状态相关
+   存储每个物理核心的上下文信息，主要与核心的压缩（compaction）状态相关
+
 ```c
 struct {
 	__uint(type, BPF_MAP_TYPE_ARRAY);
@@ -262,6 +289,7 @@ struct {
 	__type(value, struct pcpu_ctx);
 } pcpu_ctxs SEC(".maps");
 ```
+
 ```c
 // 对于每个核心，记录运行时的重要统计信息，如核心迁移、降级、提升和容量限制等行为
 // 每个键代表一种统计事件，例如 PROMOTED_TO_RESERVED 表示核心被提升到 Reserve Nest
@@ -276,7 +304,8 @@ struct {
 ```
 
 3. nest_select_cpu
-这里就是实现scx-nest的最核心的部分，大致是以下流程
+   这里就是实现scx-nest的最核心的部分，大致是以下流程
+
 ```
    首选核心检查
    ├── 尝试使用任务附加的核心 (attached_core)
@@ -323,21 +352,26 @@ struct {
 ```
 
 对于scx-nest的源代码中，这里有一个非常令人疑惑的点
+
 ```c
 bpf_rcu_read_unlock();
 update_attached(tctx, prev_cpu, cpu);
 scx_bpf_dispatch(p, SCX_DSQ_LOCAL, slice_ns, 0);// 就是这里
 return cpu;
 ```
+
 不知道是不是作者特地留给读者的坑，选了cpu选了半天，最终把task分配到了当前cpu的local_dsq，
 相当于一切选择都白花了，于是我这里改成了
+
 ```c
 scx_bpf_dispatch(p, SCX_DSQ_LOCAL_ON | cpu  , slice_ns, 0);
 ```
+
 具体[实验结果](Document/scx-nest.md)也显示了我这样改动才是对的
 
 4. nest_dispatch
-干的事情总结起来就一句话，消耗global_dsq中的任务
+   干的事情总结起来就一句话，消耗global_dsq中的任务
+
 ```c
 // 如果队列中的任务被消耗完了，即scx_bpf_consume(FALLBACK_DSQ_ID) 返回 false
 	if (!scx_bpf_consume(FALLBACK_DSQ_ID)) {
@@ -379,9 +413,9 @@ scx_bpf_dispatch(p, SCX_DSQ_LOCAL_ON | cpu  , slice_ns, 0);
 	}
 ```
 
-
 5. 我加入的改进
-对于已经知道的”坏任务“，有个ebpf_map专门来存
+   对于已经知道的”坏任务“，有个ebpf_map专门来存
+
 ```c
 struct cpu_bad_guys {
 	__uint(type, BPF_MAP_TYPE_HASH);
@@ -397,11 +431,14 @@ struct{
 	__array(values,struct cpu_bad_guys);
 } cpu_filter_ids SEC(".maps");
 ```
+
 对于这些”bad_guys“，要减少它们占用cpu的时间，具体方式是通过两个步骤
+
 - 避免把这些任务直接放到cpu的local_dsq，都是放到global_dsq
 - 减少它们的cpu使用时间slice_ns
 
 先来看看select_cpu部分，看看它调用的时机，下面是官方文档
+
 ```c
 /**
  * select_cpu - 为被唤醒的任务选择目标 CPU
@@ -423,6 +460,7 @@ struct{
  */
 s32 (*select_cpu)(struct task_struct *p, s32 prev_cpu, u64 wake_flags);
 ```
+
 当任务被唤醒但尚未加入运行队列（runqueue）时，通过此函数选择其目标 CPU，相当于任务调用流程中开始的一个阶段，
 在这里一开始直接调用scx_bpf_dispatch()可以直接调度来减轻之后的调度开销，于是我在这里直接开始过滤任务插手任务调度
 
@@ -434,7 +472,9 @@ s32 (*select_cpu)(struct task_struct *p, s32 prev_cpu, u64 wake_flags);
 		scx_bpf_dispatch(p, SCX_DSQ_LOCAL_ON | cpu  , slice_ns, 0);
 	return cpu;
 ```
+
 对于operate_bad_guys就是我设计的过滤任务的核心函数
+
 ```c
 // 对于处理过了，相当于dispatch了，就return 0，否则return 1交给正常调度
 static int operate_bad_guys(struct task_struct *p,u64 enq_flags){
@@ -477,12 +517,16 @@ static int operate_bad_guys(struct task_struct *p,u64 enq_flags){
 	return 1;
 }
 ```
+
 可以看到，所有的”坏任务“都被分配到了”FALLBACK_DSQ_ID“这个队列
+
 ```c
 FALLBACK_DSQ_ID		= 0,// 默认调度队列的标识符。
 ```
+
 可以看出来这个就是把global_dsq改了个名，就是global_dsq，而global_dsq中任务消耗的时机就是在nest_dispatch的时候，
 而nest_dispatch调用的时机，也可以从内核源码中一窥一二
+
 ```c
 /**
  * dispatch - 从 BPF 调度器调度任务并/或消费 DSQs
@@ -503,10 +547,12 @@ FALLBACK_DSQ_ID		= 0,// 默认调度队列的标识符。
  */
 void (*dispatch)(s32 cpu, struct task_struct *prev);
 ```
+
 可以看到，只有cpu的local_dsq空的时候，才会去取用global_dsq中的任务来调度，所以在select_cpu的部分，把有问题的任务分配到global_dsq的原因就是这个，
 通过这样可以进一步减少”坏任务”对系统造成的影响
 
 除了这些，在入队的时候也加上对“坏任务”的过滤
+
 ```c
 void BPF_STRUCT_OPS(nest_enqueue, struct task_struct *p, u64 enq_flags)
 {
@@ -534,10 +580,11 @@ void BPF_STRUCT_OPS(nest_enqueue, struct task_struct *p, u64 enq_flags)
 			       enq_flags);
 }
 ```
+
 在内核态的bpf文件的改进的重要部分就在这里，关于基于scx-nest的调度实验，在[这里](Document/scx-nest.md)
 
-
 ## 总结和感想
+
 对于一路下来的经历，在ebpf编程部分踩过的坑都记录在`Document/ebpf编程注意点.md`
 
 在比赛的最后这段时间，我考虑过继续完善这次比赛的监测部分，但想到关于基于ebpf的系统监测，网络上已经有了很多成型和成体系的工具，
@@ -554,3 +601,5 @@ sched_ext 让热插拔的自定义调度器成为了可能，配合全面的监�
 实现随系统压力变化的自适应优先级调整，同时庞大的监测数据可以作为 ai 的训练数据，把 ai 引入内核调度器成为了可能。
 
 希望我的这次项目，能带给之后对于调度器设计感兴趣的人一些参考，吸引更多人来尝试sched_ext
+
+(✿╹◡╹)
