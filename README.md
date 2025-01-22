@@ -1,5 +1,8 @@
 # BPF-scheduler
-2024 计算机系统能力大赛功能赛一等奖
+项目灵感最开始于2024的 CCF 暑期 glcc 夏令营，在夏令营中对eBPF技术、Linux内核调度子系统、
+sched_ext技术有了深入了解，之后在2024计算机系统能力大赛中对想法进行了完整的实现，
+包括了基于eBPF的系统监视和基于sched_ext的任务过滤，最终分别获得 glcc 明日之星和系统能力大赛一等奖
+
 
 ## 简介
 
@@ -26,7 +29,7 @@
 
 所有的视频文件都来自链接: https://pan.baidu.com/s/1h8lBofO8eoIwl1hw-mHSJA?pwd=osos 提取码: osos
 
-对于调度器方面，我将改良后的调度器和过滤部分都提供了接口，放到了 scx-plug 分支，方便二次开发
+对于调度器方面，我将改良后的调度器和过滤部单独抽象了出来，放到了 scx-plug 分支，同时为任务过滤部分提供了接口，方便二次开发
 
 ## 环境搭建
 
@@ -296,6 +299,8 @@ struct {
 ```
 
 3. nest_select_cpu
+![img_1.png](img_1.png)
+
    这里就是实现scx-nest的最核心的部分，大致是以下流程
 
 ```
@@ -574,3 +579,6 @@ void BPF_STRUCT_OPS(nest_enqueue, struct task_struct *p, u64 enq_flags)
 ```
 
 在内核态的bpf文件的改进的重要部分就在这里，关于基于scx-nest的调度实验，在[这里](Document/scx-nest.md)
+
+整体的sched_ext与监测部分的关联架构可以由下图简单表示
+![img.png](img.png)
