@@ -1,4 +1,4 @@
-# 基于eBPF的系统状况监测和基于sched_ext的自动化控制
+# BPF-scheduler
 2024 计算机系统能力大赛功能赛一等奖
 
 ## 简介
@@ -24,22 +24,11 @@
   - sched_ext的整体架构
 - 在深入理解原理之上，本项目完善了一个调度器，经过测试在高压情况下要性能要明显优于系统默认的CFS调度器
 
-补充一下，这个分支主要都是我在虚拟机上写的，一直git更新的用户就是我的GitHub账号 https://github.com/restart126
-
 所有的视频文件都来自链接: https://pan.baidu.com/s/1h8lBofO8eoIwl1hw-mHSJA?pwd=osos 提取码: osos
 
 ## 环境搭建
 
 对于具体的环境配置还有代码的运行环境，一切都在[这里](Document/环境搭建.md)，为了简洁这里就不多介绍了
-
-## 对系统性能的影响
-
-在htop的输出中可以很清晰的显示出来
-![img_32.jpg](Document%2Fimg_32.jpg)
-
-![img_33.jpg](Document%2Fimg_33.jpg)
-
-启用sched_ext调度器会使得cpu占用率有所上升，但整体仍然不超过1%
 
 ## 代码架构
 
@@ -221,7 +210,7 @@ tcpretrans记录系统中 TCP 重传的具体事件，精确定位是哪些任�
 - [Linux内核调度器介绍](Document/sched/调度.md)
 - [sched_ext架构介绍](Document/sched_ext/sched_ext.md)
 
-对于其他进程线程或是Linux系统的解析感兴趣的话可以看我知乎中的文章 https://www.zhihu.com/people/mr-mi-40 ，感谢支持:)
+对于其他进程线程或是Linux系统的解析感兴趣的话可以看我知乎中的文章 https://www.zhihu.com/people/mr-mi-40 
 
 了解了上面的基础之后，接下来讲讲基于sched_ext的scx-nest的设计
 
@@ -583,24 +572,3 @@ void BPF_STRUCT_OPS(nest_enqueue, struct task_struct *p, u64 enq_flags)
 ```
 
 在内核态的bpf文件的改进的重要部分就在这里，关于基于scx-nest的调度实验，在[这里](Document/scx-nest.md)
-
-## 总结和感想
-
-对于一路下来的经历，在ebpf编程部分踩过的坑都记录在`Document/ebpf编程注意点.md`
-
-在比赛的最后这段时间，我考虑过继续完善这次比赛的监测部分，但想到关于基于ebpf的系统监测，网络上已经有了很多成型和成体系的工具，
-以我现在的能力更多的是去学习他们的思路和方式，难以在他们的基础上有新的创新和突破
-
-但对于sched_ext部分，在完成项目的过程中，这方面的资料少之又少，大部分都是止于对它的介绍，
-而使用和在他之上的开发除了 bpf-developer-tutorial 之外没有别的
-
-所以我利用最后的这部分时间，把我完善的scx-nest部分进一步抽离了出来，同时进一步完善了和用户态的交互，代码放到了 scx-plug 分支，
-在当前 scx 分支我也建立了个 scx-plug 文件夹，把我模块化后的 scx-plug都放到了这里，只要 scx 的环境配置通过，
-这个scx-plug文件夹可以直接 make 编译，Makefile 已经调整过了，欢迎来尝试和运行
-
-sched_ext 让热插拔的自定义调度器成为了可能，配合全面的监测数据，可以将处理任务优先级的复杂逻辑大部分移动至用户态，
-实现随系统压力变化的自适应优先级调整，同时庞大的监测数据可以作为 ai 的训练数据，把 ai 引入内核调度器成为了可能。
-
-希望我的这次项目，能带给之后对于调度器设计感兴趣的人一些参考，吸引更多人来尝试sched_ext
-
-(✿╹◡╹)
