@@ -26,6 +26,8 @@
 
 所有的视频文件都来自链接: https://pan.baidu.com/s/1h8lBofO8eoIwl1hw-mHSJA?pwd=osos 提取码: osos
 
+对于调度器方面，我将改良后的调度器和过滤部分都提供了接口，放到了 scx-plug 分支，方便二次开发
+
 ## 环境搭建
 
 对于具体的环境配置还有代码的运行环境，一切都在[这里](Document/环境搭建.md)，为了简洁这里就不多介绍了
